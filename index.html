@@ -210,16 +210,30 @@
                         <input type="text" id="stockSearchInput" oninput="window.renderStockList(this.value)" class="w-full p-3 pl-10 rounded-xl border border-slate-300 shadow-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all" placeholder="Buscar en lista de stock...">
                     </div>
                     <!-- IMPORT BUTTON -->
-                    <label class="flex items-center justify-center gap-2 w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold cursor-pointer hover:bg-blue-100 transition border border-blue-200">
+                    <label class="flex items-center justify-center gap-2 w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold cursor-pointer hover:bg-blue-100 transition border border-blue-200 shadow-sm">
                         <i class="fas fa-file-csv"></i> <span>📤 Importar Lista CSV</span>
                         <input type="file" id="stockCsvInput" accept=".csv" class="hidden" onchange="window.handleStockImport(this)">
                     </label>
                 </div>
-                <div id="stockListContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 divide-y divide-slate-100 pb-24 mt-4">
+                
+                <div class="bg-yellow-50 p-3 rounded-lg border border-yellow-200 text-yellow-800 text-xs flex gap-2 mb-2 items-start">
+                    <i class="fas fa-info-circle mt-0.5"></i>
+                    <p>Formatos aceptados: Excel CSV separado por comas o punto y coma. Se detectará automáticamente la columna de descripción.</p>
+                </div>
+
+                <div id="stockListContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 divide-y divide-slate-100">
                     <div class="p-8 text-center text-slate-400">
                         <i class="fas fa-boxes text-4xl mb-2 opacity-50"></i>
                         <p>Cargando inventario...</p>
                     </div>
+                </div>
+
+                <!-- DANGER ZONE -->
+                <div class="mt-8 pb-24">
+                    <button onclick="window.clearStock()" class="w-full py-3 text-red-500 font-bold text-sm bg-red-50 rounded-xl hover:bg-red-100 transition border border-red-100 flex items-center justify-center gap-2">
+                        <i class="fas fa-trash-alt"></i> Borrar Todo el Inventario (Reset)
+                    </button>
+                    <p class="text-[10px] text-center text-slate-400 mt-2">Usa esto si cargaste mal el archivo y quieres empezar de cero.</p>
                 </div>
             </div>
 
@@ -672,7 +686,7 @@
                 const filtered = State.stockList.filter(item => item.toLowerCase().includes(term));
                 
                 if (filtered.length === 0) {
-                    container.innerHTML = '<div class="p-8 text-center text-slate-400"><i class="fas fa-boxes text-4xl mb-2 opacity-50"></i><p>Sin resultados o inventario vacío</p></div>';
+                    container.innerHTML = '<div class="p-8 text-center text-slate-400"><i class="fas fa-boxes text-4xl mb-2 opacity-50"></i><p>Inventario vacío o sin resultados</p></div>';
                     return;
                 }
 
@@ -1072,54 +1086,122 @@
             container.appendChild(row);
         };
         
-        // --- STOCK IMPORT FEATURE ---
+        // --- IMPROVED STOCK IMPORT FEATURE ---
         window.handleStockImport = async (input) => {
             const file = input.files[0];
             if (!file) return;
 
-            UI.toast("Procesando archivo...", "info");
+            UI.toast("Analizando archivo...", "info");
             const reader = new FileReader();
+            
             reader.onload = async (e) => {
-                const text = e.target.result;
-                const rows = text.split('\n');
+                let text = e.target.result;
+                // Normalize new lines
+                text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                
+                const lines = text.split('\n');
+                if (lines.length < 2) return UI.toast("El archivo parece vacío", "error");
+
+                // Detect Separator (Comma or Semicolon) based on first line
+                const firstLine = lines[0];
+                const commaCount = (firstLine.match(/,/g) || []).length;
+                const semiCount = (firstLine.match(/;/g) || []).length;
+                const separator = semiCount > commaCount ? ';' : ',';
+
+                console.log(`Detected separator: ${separator}`);
+
                 const newItems = [];
 
-                // Parse CSV - Assuming format: *Codigo,*Descripcion (index 1)
-                for (let i = 1; i < rows.length; i++) { // Skip header
-                    const row = rows[i];
-                    if (!row) continue;
+                // Helper to split CSV line respecting quotes
+                const parseLine = (line) => {
+                    const result = [];
+                    let start = 0;
+                    let inQuotes = false;
+                    for (let i = 0; i < line.length; i++) {
+                        if (line[i] === '"') { inQuotes = !inQuotes; }
+                        else if (line[i] === separator && !inQuotes) {
+                            let val = line.substring(start, i).trim();
+                            if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+                            result.push(val.replace(/""/g, '"'));
+                            start = i + 1;
+                        }
+                    }
+                    let lastVal = line.substring(start).trim();
+                    if (lastVal.startsWith('"') && lastVal.endsWith('"')) lastVal = lastVal.slice(1, -1);
+                    result.push(lastVal.replace(/""/g, '"'));
+                    return result;
+                };
+
+                // Skip header (i=1)
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
                     
-                    const cols = row.split(','); // Simple split by comma
+                    const cols = parseLine(line);
+                    
+                    // Logic to find description
+                    // Usually: Code, Description, ... -> Index 1
+                    // Fallback: If index 1 is empty or looks like a number, check index 0
+                    
+                    let desc = '';
                     if (cols.length > 1) {
-                         // Clean quotes if any
-                         const desc = cols[1].trim().replace(/"/g, ''); 
-                         if (desc) newItems.push(desc);
+                         desc = cols[1]; // Default to 2nd column
+                    } else if (cols.length === 1) {
+                         desc = cols[0]; // Only 1 column? Use it.
+                    }
+
+                    // Clean up bad characters or "numbers behind/ahead"
+                    // If description looks like "12345" (just number), ignore it
+                    // If description contains letters, keep it.
+                    if (desc && /[a-zA-Z]/.test(desc)) {
+                        newItems.push(desc);
                     }
                 }
 
-                if (newItems.length === 0) return UI.toast("No se encontraron productos", "error");
+                if (newItems.length === 0) return UI.toast("No se encontraron productos válidos", "error");
 
                 UI.toast(`Subiendo ${newItems.length} productos...`, "info");
 
-                // Batch upload to Firestore 'stock' collection
+                // Batch upload
                 const batchSize = 400; 
                 const stockCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'stock');
                 
-                // We will use batches
                 for (let i = 0; i < newItems.length; i += batchSize) {
                     const chunk = newItems.slice(i, i + batchSize);
                     const batch = writeBatch(db);
                     chunk.forEach(item => {
-                        const ref = doc(stockCol); // Auto-ID
+                        const ref = doc(stockCol);
                         batch.set(ref, { name: item, createdAt: serverTimestamp() });
                     });
                     await batch.commit();
                 }
 
-                UI.toast("Importación completada con éxito", "success");
-                input.value = ''; // Reset
+                UI.toast("Importación exitosa", "success");
+                input.value = '';
             };
             reader.readAsText(file);
+        };
+
+        // NEW: Clear Stock Function
+        window.clearStock = async () => {
+            if(!confirm("⚠️ ¡PELIGRO!\n\nEsto borrará TODOS los productos de la lista de autocompletado.\n\nÚsalo solo si la importación anterior salió mal y quieres limpiar todo.\n\n¿Estás seguro?")) return;
+            
+            UI.toast("Borrando inventario...", "warning");
+            const q = query(collection(db, 'artifacts', APP_ID, 'public', 'data', 'stock'));
+            const snap = await getDocs(q);
+            
+            // Delete in batches
+            const batchSize = 400;
+            const docs = snap.docs;
+            for (let i = 0; i < docs.length; i += batchSize) {
+                const batch = writeBatch(db);
+                docs.slice(i, i + batchSize).forEach(d => batch.delete(d.ref));
+                await batch.commit();
+            }
+            
+            UI.toast("Inventario borrado", "success");
+            State.stockList = [];
+            UI.renderStockList('');
         };
 
         // SAVE BUTTONS
