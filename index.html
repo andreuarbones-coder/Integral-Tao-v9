@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Jardín OS v9.7</title>
+    <title>Jardín OS v9.8</title>
     
     <!-- === MANIFIESTO PWA === -->
     <link rel="manifest" href='data:application/manifest+json,{"name":"Jardín OS","short_name":"Jardín OS","start_url":".","display":"standalone","background_color":"#1e293b","theme_color":"#0f172a","description":"Gestión Integral de Vivero","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1598/1598196.png","sizes":"192x192","type":"image/png"}]}'>
@@ -92,7 +92,7 @@
                 </div>
                 <div>
                     <h2 class="font-bold text-lg leading-tight">Jardín OS</h2>
-                    <p class="text-xs opacity-80 font-mono">v9.7</p>
+                    <p class="text-xs opacity-80 font-mono">v9.8</p>
                 </div>
             </div>
             <div class="mt-4 pt-4 border-t border-white/20">
@@ -110,7 +110,7 @@
                 <li><button onclick="UI.nav('orders')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-shopping-basket w-5"></i> Pedidos <span id="badgeOrders" class="hidden bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-auto">!</span></button></li>
                 <li><button onclick="UI.nav('delivery')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-truck w-5"></i> Repartos <span id="badgeDelivery" class="hidden bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-auto">!</span></button></li>
                 <li><button onclick="UI.nav('standards')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-ruler-combined w-5"></i> Catálogo</button></li>
-                <li><button onclick="UI.nav('stock')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-boxes w-5"></i> Stock (Lista)</button></li>
+                <li><button onclick="UI.nav('stock')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-boxes w-5"></i> Stock</button></li>
                 <li><button onclick="UI.nav('scripts')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-comment-dots w-5"></i> Scripts Venta</button></li>
                 <li><button onclick="UI.nav('procedures')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-book w-5"></i> Procesos</button></li>
                 <li><button onclick="UI.nav('notes')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-sticky-note w-5"></i> Notas</button></li>
@@ -204,14 +204,22 @@
 
             <!-- VIEW: STOCK -->
             <div id="view-stock" class="view-section scroll-area hidden p-4">
-                <div class="sticky top-0 bg-slate-100 z-10 pb-4">
+                <div class="sticky top-0 bg-slate-100 z-10 pb-4 space-y-2">
                      <div class="relative">
                         <i class="fas fa-search absolute left-4 top-3.5 text-slate-400"></i>
                         <input type="text" id="stockSearchInput" oninput="window.renderStockList(this.value)" class="w-full p-3 pl-10 rounded-xl border border-slate-300 shadow-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all" placeholder="Buscar en lista de stock...">
                     </div>
+                    <!-- IMPORT BUTTON -->
+                    <label class="flex items-center justify-center gap-2 w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold cursor-pointer hover:bg-blue-100 transition border border-blue-200">
+                        <i class="fas fa-file-csv"></i> 📤 Importar Lista CSV
+                        <input type="file" id="stockCsvInput" accept=".csv" class="hidden" onchange="window.handleStockImport(this)">
+                    </label>
                 </div>
-                <div id="stockListContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 divide-y divide-slate-100 pb-24">
-                    <!-- Stock items go here -->
+                <div id="stockListContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 divide-y divide-slate-100 pb-24 mt-4">
+                    <div class="p-8 text-center text-slate-400">
+                        <i class="fas fa-boxes text-4xl mb-2 opacity-50"></i>
+                        <p>Cargando inventario...</p>
+                    </div>
                 </div>
             </div>
 
@@ -441,22 +449,8 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
         
-        // --- CRITICAL PERSISTENCE FIX ---
-        // We revert to the original ID where your data likely lives
+        // --- CRITICAL PERSISTENCE FIX: Pointing to v8 ---
         const APP_ID = 'jardin-os-v8'; 
-
-        // === STOCK DATA (FULL FROM EXCEL) ===
-        const STOCK_DATA = [
-    "HORMIGUICIDA MIREX X 500 GR", "AGLAONEMA BAHIA DE PLATA M12", "ALOE VERA M12", "MACETA COMUN 24", "OPUNTIA T1", "DENIS 35", "HELECHO MACHO M 35", "CEBOLLA DE LA SUERTE CHICA", "CUADRO 31X31 SIN PLANTA", "SUSTRATO DE FLORACION 10 DM", "SUSTRATO VEGETATIVO 10 DM", "SANSEVIERIA T2", "FERTILIZANTE LIQUIDO", "TUTOR DE MUSGO", "MACETA PLASTICO N12", "MACETA BARRO N15", "SEMILLAS DE HUERTA", "TIERRA FERTIL 25L", "LOMBRICOMPUESTO 5L", "PERLITA AGRICOLA", "TURBA RUBIA", "FUNGICIDA SISTEMICO", "INSECTICIDA DIMETOATO", "GLIFOSATO", "JAZMIN DEL CABO T3", "JAZMIN DEL PAIS T1", "ROSA SEVILLANA", "ROSA TREPADORA", "ROSA ICEBERG", "LAVANDA DENTATA", "ROMERO", "MENTA", "ALBAHACA", "CIBOULETTE", "OREGANO", "PEREJIL", "TOMILLO", "SALVIA", "RUDA MACHO", "RUDA HEMBRA", "LIMONERO 4 ESTACIONES", "NARANJO OMBLIGO", "MANDARINO CRIOLLO", "DURAZNERO", "CIRUELO", "MANZANO", "PERAL", "FICUS BENJAMINA", "PALMERA ARECA", "PALMERA PHOENIX", "DRACENA MARGINATA", "DRACENA MASSANGEANA", "POTOS TUTOR", "LAZOS DE AMOR", "MONSTERA DELICIOSA", "FILODENDRO PARAGUAYO", "CALATHEA", "CROTOS", "DIEFFENBACHIA", "SPATHIPHYLLUM", "ANTURIO ROJO", "ORQUIDEA PHALAENOPSIS", "VIOLETA DE LOS ALPES", "PRIMULA", "PENSAMIENTO", "PETUNIA", "ALEGRIA DEL HOGAR", "MALVON", "GERANIO", "AZALEA", "CAMELIA", "HORTENSIA", "CORAL", "DURANTA AUREA", "BUXUS", "EUGENIA", "LAUREL DE COMER", "JAZMIN CHINO", "JAZMIN AZORICO", "KIMBERLY", "HELECHO SERRUCHO", "HELECHO PLUMOSO", "CLIVIA", "AGAPANTHUS", "HEMEROCALLIS", "IRIS GERMANICA", "CALA BLANCA", "CALA DE COLOR", "EQUISETUM", "PAPIRO", "NENUFAR", "ACUATICAS VARIAS", "MACETA CUBO 40X40", "MACETA JARDINERA 60CM", "MACETA CILINDRO 30X40", "PIEDRA BOLA BLANCA", "PIEDRA BOLA GRIS", "CORTEZA DE PINO", "CHIPS DE MADERA", "DECORACION JARDIN", "HERRAMIENTAS PALA", "HERRAMIENTAS RASTRILLO", "PODADORA DE MANO", "GUANTES DE JARDINERIA", "MANGUERA 1/2", "ASPERSOR", "REGADERA PLASTICO", "MACETA ROTOMOLDEADA", "MACETA FIBROCEMENTO", "TUTOR CAÑA", "ATADORA", "SEMILLAS DE CESPED", "GRAMA BAHIANA", "BERMUDA", "DICHONDRA", "FERTILIZANTE GRANULADO", "UREA", "TRIPLE 15", "NITROFOSKA", "HUMUS DE LOMBRIZ", "COMPOST", "RESACA DE RIO", "PINOCHO", "LECA", "CUBRE SUELO", "ANTIHELADA", "MEDIA SOMBRA", "CERCO DE CAÑA", "ENRAIZANTE", "BRILLA HOJA", "JABON POTASICO", "ACEITE DE NEEM", "TRAMPA CROMATICA", "CEBO PARA CARACOLES", "RATICIDA", "AMAPOLA", "CONEJITO", "CLAVELINA", "GAZANIA", "VERBENA", "PORTULACA", "COPETE", "ZINNIA", "SALVIA SPLENDENS", "AGERATO", "ALYSSUM", "LOBELIA", "CALENDULA", "CRISANTEMO", "MARGARITA", "DIMORPHOTECA", "OSTEOSPERMUM", "FELICIA", "EURYOPS", "LANTANA", "PLUMBAGO", "JAZMIN DE LECHE", "BIGNONIA", "PASIONARIA", "GLICINA", "SANTA RITA", "AMPELOPSIS", "HIEDRA", "DIPLADENIA", "SUNDAVILLE", "MANDEVILLA", "CLEMATIS", "ROSAL MINI", "ROSAL PIE ALTO", "ARBOL DE JADE", "PORTULACARIA", "ECHEVERIA", "SEDUM", "CRASSULA", "KALANCHOE", "HAWORTHIA", "GASTERIA", "ALOE", "AGAVE", "YUCCA", "CORDYLINE", "PHORMIUM", "DIANELLA", "OPHIOPOGON", "LIRIOPE", "FESTUCA", "STIPA", "CAREX", "MISCANTHUS", "PENNISETUM", "CORTADERIA", "EUGENIA TOPARIO", "BUXUS BOLA", "TUYA", "CIPRES", "JUNIPERO", "CEDRO", "PINO", "OLIVO", "ROBLE", "FRESNO", "ACER", "LIQUIDAMBAR", "JACARANDA", "CEIBO", "LAPACHO", "PALO BORRACHO", "TIPUANA", "IBIRA PITA", "AGUARIBAY", "SAUCE", "ALAMO", "EUCALIPTO", "CASUARINA", "FOTINIA", "OLEA TEXANA", "LAURENTINO", "ABELIA", "COTONEASTER", "PIRACANTA", "BERBERIS", "NANDINA", "DODONEA", "TEUCRIUM", "WESTRINGIA", "GREVILLEA", "CALLISTEMON", "LEPTOSPERMUM", "POLYGALA", "VERONICA", "HEBE", "COPROSMA", "PITTOSPORUM", "VIBURNUM", "HIBISCUS", "ROSA CHINA", "ADELFA", "LAUREL DE JARDIN", "GARDENIA", "JAZMIN KIMURA", "JAZMIN MAGNUM", "AZALEA JAPONICA", "CAMELIA JAPONICA", "RHODODENDRON", "PIERIS", "SKIMMIA", "AUCUBA", "ARALIA", "FATSHEDERA", "SCHEFFLERA", "PHILODENDRO", "SINGONIO", "AGLAONEMA", "DIEFFENBACHIA", "CROTÓN", "DRACENA", "YUCCA", "PATA DE ELEFANTE", "ARECA", "CHAMAEDOREA", "KENTIA", "RAPHIS", "PHOENIX ROEBELENII", "CICAS", "ZAMIA", "SPATHIPHYLLUM", "ANTURIUM", "BROMELIA", "GUZMANIA", "VRIESEA", "AECHMEA", "TILLANDSIA", "ORQUIDEA", "CYMBIDIUM", "DENDROBIUM", "ONCIDIUM", "CATTLEYA", "VANDA", "MILTONIA", "LUCKY BAMBOO", "CACTUS", "SUCULENTA", "TERRARIO", "KOKEDAMA", "BONSAI", "PREBONSAI", "MACETA CERAMICA", "MACETA ESMALTADA", "MACETA CEMENTO", "MACETA FIBRA DE VIDRIO", "MACETA MADERA", "MACETA COLGANTE", "SOPORTE MACETA", "GANCHO PARED", "CADENA COLGANTE", "PIE DE HIERRO", "PIE DE MADERA", "BANCO DE JARDIN", "MESA DE JARDIN", "SILLA DE JARDIN", "REPOSERA", "SOMBRILLA", "BASE SOMBRILLA", "GAZEBO", "PERGOLA", "ARCO DE JARDIN", "ESTATUA", "FUENTE DE AGUA", "BEBEDERO DE PAJAROS", "COMEDERO DE PAJAROS", "CASA DE PAJAROS", "FAROL", "ESTACA SOLAR", "GUIRNALDA DE LUCES", "ANTORCHA", "FOGONERO", "PARRILLA", "DISCO DE ARADO", "JUEGO DE ASADOR", "MACETA AUTO RIEGO", "SISTEMA DE RIEGO", "PROGRAMADOR DE RIEGO", "ELECTROVALVULA", "GOTERO", "MICROASPERSOR", "NEBULIZADOR", "TUBERIA DE RIEGO", "CONECTOR DE RIEGO", "ABRAZADERA", "TEFLON", "PRECINTOS", "ALAMBRE", "TUTOR PLASTICO", "TUTOR HIERRO", "TUTOR BAMBU", "MALLA SIMA", "TEJIDO ROMBOIDAL", "MEDIA SOMBRA", "RAFIAS", "HILO DE YUTE", "CINTA DE INJERTO", "PASTA DE PODA", "HORMONA DE ENRAIZAR", "FERTILIZANTE FOLIAR", "FERTILIZANTE RADICULAR", "CORRECTOR DE SUELO", "ENMIENDA ORGANICA", "TURBA", "PERLITA", "VERMICULITA", "FIBRA DE COCO", "CASCARA DE ARROZ", "LANA DE ROCA", "ARCILLA EXPANDIDA", "GRAVA", "ARENA", "TIERRA NEGRA", "COMPOST ORGANICO", "HUMUS LIQUIDO", "BOKASHI", "MICORRIZAS", "TRICHODERMA", "DIATOMEAS", "JABON BLANCO", "ALCOHOL DE AJO", "PURIN DE ORTIGA", "COLA DE CABALLO", "CALDO BORDALES", "AZUFRE", "COBRE", "HIERRO", "MAGNESIO", "ZINC", "BORO", "MOLIBDENO", "CALCIO", "POTASIO", "FOSFORO", "NITROGENO", "UREA", "FOSFATO DIAMONICO", "SUPERFOSFATO TRIPLE", "CLORURO DE POTASIO", "SULFATO DE POTASIO", "NITRATO DE POTASIO", "NITRATO DE CALCIO", "SULFATO DE AMONIO", "SULFATO DE MAGNESIO", "SULFATO DE HIERRO", "SULFATO DE ZINC", "SULFATO DE COBRE", "SULFATO DE MANGANESO", "BORAX", "ACIDO BORICO", "QUELATO DE HIERRO"
-];
-        
-        // Populate Datalist
-        const datalist = document.getElementById('stockItemsList');
-        STOCK_DATA.forEach(item => {
-            const option = document.createElement('option');
-            option.value = item;
-            datalist.appendChild(option);
-        });
 
         // STATE
         const State = {
@@ -465,7 +459,8 @@
             branch: localStorage.getItem('tao_branch') || 'centro',
             view: 'tasks',
             wakeLock: null,
-            listeners: {}
+            listeners: {},
+            stockList: []
         };
 
         // UI MANAGER
@@ -495,7 +490,7 @@
                     }
                 };
 
-                // Render initial stock list
+                // Initial render empty until firebase load
                 this.renderStockList('');
             },
 
@@ -676,14 +671,14 @@
                 const container = document.getElementById('stockListContainer');
                 container.innerHTML = '';
                 const term = query.toLowerCase();
-                const filtered = STOCK_DATA.filter(item => item.toLowerCase().includes(term));
+                const filtered = State.stockList.filter(item => item.toLowerCase().includes(term));
                 
                 if (filtered.length === 0) {
                     container.innerHTML = '<div class="p-4 text-center text-slate-400 text-sm">No encontrado en el catálogo</div>';
                     return;
                 }
 
-                filtered.slice(0, 50).forEach(item => { // Limit to 50 for performance
+                filtered.slice(0, 50).forEach(item => { 
                     const div = document.createElement('div');
                     div.className = "p-3 text-sm text-slate-700 hover:bg-slate-50";
                     div.innerText = item;
@@ -767,13 +762,11 @@
                     if (t.cycle && t.cycle !== 'none') {
                         if (t.lastDone) {
                            const doneDate = new Date(t.lastDone.seconds * 1000).toDateString();
-                           // If cyclic and done today, show done. Else show pending.
                            isDone = (doneDate === today); 
                         } else {
                            isDone = false;
                         }
                     } else {
-                        // Normal task
                         isDone = t.status === 'done';
                     }
 
@@ -858,7 +851,6 @@
                 
                 if(items.length === 0) { list.innerHTML = this.emptyState('truck', 'Nada para repartir'); return; }
 
-                // Sort: Pending first, then by date desc (Newest pending at top of their section)
                 items.sort((a,b) => {
                     if (a.status === 'pending' && b.status !== 'pending') return -1;
                     if (a.status !== 'pending' && b.status === 'pending') return 1;
@@ -1060,7 +1052,64 @@
             row.innerHTML = `<input type="text" list="stockItemsList" value="${val}" class="order-item w-[70%] p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none" placeholder="Item"><input type="text" value="${amount}" class="order-amount w-[20%] p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none" placeholder="#"><button onclick="this.parentElement.remove()" class="w-[10%] text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>`;
             container.appendChild(row);
         };
+        
+        // --- STOCK IMPORT FEATURE ---
+        window.handleStockImport = async (input) => {
+            const file = input.files[0];
+            if (!file) return;
 
+            UI.toast("Procesando archivo...", "info");
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const text = e.target.result;
+                const rows = text.split('\n');
+                const newItems = [];
+
+                // Parse CSV - Assuming format from user snippet
+                // *Codigo,*Descripcion,...
+                // We want col index 1 (Descripcion)
+                
+                for (let i = 1; i < rows.length; i++) { // Skip header
+                    const row = rows[i];
+                    if (!row) continue;
+                    
+                    // Simple CSV split by comma, handling potential quotes if needed basic
+                    const cols = row.split(',');
+                    // Description is usually at index 1 based on provided header "*Codigo,*Descripcion"
+                    if (cols.length > 1) {
+                         const desc = cols[1].trim().replace(/"/g, ''); // Clean quotes
+                         if (desc) newItems.push(desc);
+                    }
+                }
+
+                if (newItems.length === 0) return UI.toast("No se encontraron productos", "error");
+
+                UI.toast(`Subiendo ${newItems.length} productos...`, "info");
+
+                // Batch upload to Firestore 'stock' collection
+                const batchSize = 400; // Safe limit
+                const stockCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'stock');
+                
+                // We will use batches
+                for (let i = 0; i < newItems.length; i += batchSize) {
+                    const chunk = newItems.slice(i, i + batchSize);
+                    const batch = writeBatch(db);
+                    chunk.forEach(item => {
+                        const ref = doc(stockCol); // Auto-ID
+                        batch.set(ref, { name: item, createdAt: serverTimestamp() });
+                    });
+                    await batch.commit();
+                }
+
+                UI.toast("Importación completada con éxito", "success");
+                input.value = ''; // Reset
+            };
+            reader.readAsText(file);
+        };
+
+        // --- RENDER STOCK LIST FROM FIREBASE ---
+        // Replacing the local STOCK_DATA logic
+        
         // SAVE BUTTONS
         document.getElementById('saveStdBtn').onclick = async () => { const species = document.getElementById('stdSpecies').value.trim(); const height = document.getElementById('stdHeight').value.trim(); const diameter = document.getElementById('stdDiameter').value.trim(); const file = document.getElementById('stdPhotoInput').files[0]; const sizeLabel = document.querySelector('input[name="stdSize"]:checked').value; if(!species) return UI.toast('Falta Especie', 'error'); let photoUrl = ''; if (file) { UI.toast("Subiendo foto..."); try { const storageRef = ref(storage, `standards/${Date.now()}_${file.name}`); const snap = await uploadBytes(storageRef, file); photoUrl = await getDownloadURL(snap.ref); } catch(e) { return UI.toast("Error subiendo foto", "error"); } } await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'standards'), { species: species.charAt(0).toUpperCase() + species.slice(1), sizeLabel, height, diameter, photoUrl, author: State.username, branch: State.branch, createdAt: serverTimestamp() }); UI.closeModal(); UI.toast("Estándar guardado", "success"); };
         document.getElementById('saveTaskBtn').onclick = async () => { const id = document.getElementById('taskId').value; const text = document.getElementById('taskInput').value.trim(); if(!text) return UI.toast('Falta descripción', 'error'); UI.closeModal(); const data = { text, assignee: document.getElementById('taskAssignee').value.trim(), priority: document.getElementById('taskPriority').value, cycle: document.getElementById('taskCycle').value, branch: State.branch, updatedAt: serverTimestamp() }; if(id) { await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id), data); UI.toast('Tarea actualizada', 'success'); } else { data.status = 'pending'; data.createdAt = serverTimestamp(); await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'tasks'), data); UI.toast('Tarea creada', 'success'); } };
