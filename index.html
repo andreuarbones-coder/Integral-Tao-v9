@@ -220,6 +220,8 @@
                     <i class="fas fa-info-circle mt-0.5"></i>
                     <p>Formatos aceptados: Excel CSV separado por comas o punto y coma. Se detectará automáticamente la columna de descripción.</p>
                 </div>
+                
+                <div id="stockTotalCount" class="text-[10px] text-slate-400 text-right mb-1 font-mono"></div>
 
                 <div id="stockListContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 divide-y divide-slate-100">
                     <div class="p-8 text-center text-slate-400">
@@ -682,6 +684,11 @@
             renderStockList(query) {
                 const container = document.getElementById('stockListContainer');
                 container.innerHTML = '';
+                
+                // Mostrar contador total real
+                const countEl = document.getElementById('stockTotalCount');
+                if(countEl) countEl.innerText = `Total en base de datos: ${State.stockList.length} items`;
+
                 const term = query.toLowerCase();
                 const filtered = State.stockList.filter(item => item.toLowerCase().includes(term));
                 
@@ -702,8 +709,8 @@
             updateAutocomplete() {
                 const datalist = document.getElementById('stockItemsList');
                 datalist.innerHTML = '';
-                // Limit autocomplete options for performance
-                State.stockList.slice(0, 500).forEach(item => {
+                // FIX: Aumentado el límite de 500 a 5000 para que aparezca todo el inventario
+                State.stockList.slice(0, 5000).forEach(item => {
                     const option = document.createElement('option');
                     option.value = item;
                     datalist.appendChild(option);
