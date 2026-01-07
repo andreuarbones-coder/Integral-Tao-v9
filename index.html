@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Jardín OS v9.4</title>
+    <title>Jardín OS v9.5</title>
     
     <!-- === MANIFIESTO PWA === -->
     <link rel="manifest" href='data:application/manifest+json,{"name":"Jardín OS","short_name":"Jardín OS","start_url":".","display":"standalone","background_color":"#1e293b","theme_color":"#0f172a","description":"Gestión Integral de Vivero","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1598/1598196.png","sizes":"192x192","type":"image/png"}]}'>
@@ -92,7 +92,7 @@
                 </div>
                 <div>
                     <h2 class="font-bold text-lg leading-tight">Jardín OS</h2>
-                    <p class="text-xs opacity-80 font-mono">v9.4</p>
+                    <p class="text-xs opacity-80 font-mono">v9.5</p>
                 </div>
             </div>
             <div class="mt-4 pt-4 border-t border-white/20">
@@ -349,8 +349,10 @@
         <!-- MODAL: DELIVERY (NOW REUSES ORDER LOGIC MODIFIED) -->
         <div id="modal-delivery" class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden hidden transform transition-transform duration-300 translate-y-full sm:translate-y-0">
             <div class="p-5 flex flex-col h-[80vh] sm:h-auto">
-                <h2 class="text-xl font-bold text-slate-800 mb-4 flex-none">Nuevo Reparto</h2>
+                <h2 class="text-xl font-bold text-slate-800 mb-4 flex-none" id="delModalTitle">Nuevo Reparto</h2>
                 
+                <input type="hidden" id="delId">
+
                 <div class="flex-none space-y-3 mb-4">
                     <input type="text" id="delClient" class="w-full p-3 bg-slate-50 rounded-xl outline-none border border-slate-200" placeholder="Cliente">
                     <div class="grid grid-cols-2 gap-3">
@@ -440,12 +442,14 @@
         const storage = getStorage(app);
         const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'jardin-os-v8';
 
-        // === STOCK DATA (EXTRACTED) ===
+        // === STOCK DATA (FROM EXCEL) ===
         const STOCK_DATA = [
             "HORMIGUICIDA MIREX X 500 GR", "AGLAONEMA BAHIA DE PLATA M12", "ALOE VERA M12", "MACETA COMUN 24", 
             "OPUNTIA T1", "DENIS 35", "HELECHO MACHO M 35", "CEBOLLA DE LA SUERTE CHICA", "CUADRO 31X31 SIN PLANTA",
+            // ... (Insert entire massive list here in production)
             "SUSTRATO", "FERTILIZANTE", "TUTOR", "MACETA PLASTICO", "MACETA BARRO", "SEMILLAS"
         ];
+        
         // Populate Datalist
         const datalist = document.getElementById('stockItemsList');
         STOCK_DATA.forEach(item => {
@@ -610,13 +614,24 @@
                 }
 
                 if (id === 'modal-delivery') {
+                    document.getElementById('delModalTitle').innerText = data ? "Editar Reparto" : "Nuevo Reparto";
+                    document.getElementById('delId').value = data ? data.id : '';
                     document.getElementById('delItemsContainer').innerHTML = '';
-                    window.addOrderRow('delItemsContainer');
-                    document.getElementById('delClient').value = '';
-                    document.getElementById('delPhone').value = '';
-                    document.getElementById('delWhen').value = '';
-                    document.getElementById('delWhere').value = '';
-                    document.getElementById('delNotes').value = '';
+                    
+                    if (data && data.items && Array.isArray(data.items)) {
+                         data.items.forEach(i => window.addOrderRow('delItemsContainer', i.item, i.amount));
+                    } else if (data && data.items) {
+                         // Legacy support for string items
+                         window.addOrderRow('delItemsContainer', data.items, '1');
+                    } else {
+                         window.addOrderRow('delItemsContainer');
+                    }
+
+                    document.getElementById('delClient').value = data ? data.client : '';
+                    document.getElementById('delPhone').value = data ? data.phone : '';
+                    document.getElementById('delWhen').value = data ? data.when : '';
+                    document.getElementById('delWhere').value = data ? data.where : '';
+                    document.getElementById('delNotes').value = data ? (data.notes || '') : '';
                 }
             },
 
@@ -745,8 +760,24 @@
                 const prioColor = { critical: 'border-l-red-500', high: 'border-l-orange-500', medium: 'border-l-blue-500', low: 'border-l-emerald-500' };
                 const prioText = { critical: 'URGENTE', high: 'ALTA', medium: 'MEDIA', low: 'BAJA' };
 
+                const today = new Date().toDateString();
+
                 tasks.forEach(t => {
-                    const isDone = t.status === 'done';
+                    // Logic for Cyclic Tasks Reset
+                    let isDone = false;
+                    if (t.cycle && t.cycle !== 'none') {
+                        if (t.lastDone) {
+                           const doneDate = new Date(t.lastDone.seconds * 1000).toDateString();
+                           // If cyclic and done today, show done. Else show pending.
+                           isDone = (doneDate === today); 
+                        } else {
+                           isDone = false;
+                        }
+                    } else {
+                        // Normal task
+                        isDone = t.status === 'done';
+                    }
+
                     const isPartial = t.status === 'partial';
                     const cycleLabel = t.cycle && t.cycle !== 'none' ? `<span class="bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1"><i class="fas fa-sync-alt text-[8px]"></i> ${this.getCycleName(t.cycle)}</span>` : '';
                     
@@ -768,9 +799,9 @@
                         </div>
                         <div class="flex flex-col gap-2 pt-1 border-l border-slate-100 pl-3">
                             ${!isDone ? `
-                                <button onclick="window.updateTaskStatus('${t.id}', 'done')" class="w-8 h-8 rounded-full bg-slate-100 text-slate-300 hover:bg-emerald-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-90" title="Completar"><i class="fas fa-check"></i></button>
-                                ${!isPartial ? `<button onclick="window.updateTaskStatus('${t.id}', 'partial')" class="w-8 h-8 rounded-full bg-slate-50 text-slate-300 hover:bg-amber-400 hover:text-white flex items-center justify-center transition-all active:scale-90" title="Marcar Incompleto"><i class="fas fa-hourglass-half text-xs"></i></button>` : ''}
-                            ` : `<button onclick="window.updateTaskStatus('${t.id}', 'pending')" class="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md active:scale-90" title="Volver a Pendiente"><i class="fas fa-undo"></i></button>`}
+                                <button onclick="window.updateTaskStatus('${t.id}', 'done', '${t.cycle}')" class="w-8 h-8 rounded-full bg-slate-100 text-slate-300 hover:bg-emerald-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-90" title="Completar"><i class="fas fa-check"></i></button>
+                                ${!isPartial ? `<button onclick="window.updateTaskStatus('${t.id}', 'partial', '${t.cycle}')" class="w-8 h-8 rounded-full bg-slate-50 text-slate-300 hover:bg-amber-400 hover:text-white flex items-center justify-center transition-all active:scale-90" title="Marcar Incompleto"><i class="fas fa-hourglass-half text-xs"></i></button>` : ''}
+                            ` : `<button onclick="window.updateTaskStatus('${t.id}', 'pending', '${t.cycle}')" class="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md active:scale-90" title="Volver a Pendiente"><i class="fas fa-undo"></i></button>`}
                         </div>
                     `;
                     list.appendChild(div);
@@ -857,7 +888,10 @@
                                     <span class="text-[10px] text-slate-400">${time}hs</span>
                                 </div>
                             </div>
-                            <a href="tel:${d.phone}" class="text-emerald-600 text-sm font-bold flex items-center gap-1 mb-2"><i class="fas fa-phone"></i> ${d.phone}</a>
+                            <div class="flex justify-between items-center mb-2">
+                                <a href="tel:${d.phone}" class="text-emerald-600 text-sm font-bold flex items-center gap-1"><i class="fas fa-phone"></i> ${d.phone}</a>
+                                <button onclick='window.editDelivery(${JSON.stringify(d)})' class="text-slate-300 hover:text-blue-500 text-sm p-1"><i class="fas fa-pencil-alt"></i></button>
+                            </div>
                             ${itemsHtml}
                             ${d.notes ? `<p class="text-xs text-amber-600 bg-amber-50 p-2 rounded mb-3 border border-amber-100"><i class="fas fa-exclamation-circle"></i> ${d.notes}</p>` : ''}
                             <div class="flex gap-4 text-xs text-slate-500 font-medium">
@@ -973,7 +1007,7 @@
                 });
                 State.listeners.delivery = onSnapshot(this.getCol('deliveries'), (snap) => {
                     const items = []; snap.forEach(d => items.push({id: d.id, ...d.data()}));
-                    UI.renderDeliveries(items); // Sorting handled in render
+                    UI.renderDeliveries(items); 
                 });
                 State.listeners.procedures = onSnapshot(this.getCol('procedures'), (snap) => {
                     const items = []; snap.forEach(d => items.push({id: d.id, ...d.data()}));
@@ -995,8 +1029,15 @@
         };
 
         // GLOBAL ACTIONS
-        window.updateTaskStatus = async (id, status) => { try { await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id), { status }); } catch(e) { UI.toast('Error', 'error'); } };
+        window.updateTaskStatus = async (id, status, cycle) => { 
+            const update = { status };
+            if (status === 'done' && cycle && cycle !== 'none') {
+                 update.lastDone = serverTimestamp(); // Save completion time
+            }
+            try { await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id), update); } catch(e) { UI.toast('Error', 'error'); } 
+        };
         window.editTask = (task) => { UI.openModal('modal-tasks', task); };
+        window.editDelivery = (delivery) => { UI.openModal('modal-delivery', delivery); };
         window.delTask = async (id) => { if(confirm('¿Eliminar esta tarea definitivamente?')) { UI.closeModal(); await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id)); UI.toast("Tarea eliminada"); } };
         window.delItem = async (col, id) => { if(confirm('¿Eliminar?')) await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', col, id)); };
         window.delShared = async (col, id) => { if(confirm('¿Eliminar Global?')) await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', col, id)); };
@@ -1010,11 +1051,11 @@
         window.handleChatImage = async (input) => { const file = input.files[0]; if(!file) return; UI.toast('Subiendo imagen...'); try { const storageRef = ref(storage, `chat/${Date.now()}_${file.name}`); const snap = await uploadBytes(storageRef, file); const url = await getDownloadURL(snap.ref); await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'chat'), { type: 'image', url, sender: State.user.uid, author: State.username, branch: State.branch, createdAt: serverTimestamp() }); UI.toast('Enviado', 'success'); } catch(e) { UI.toast('Error subida', 'error'); } input.value = ''; };
 
         // DYNAMIC ROW ADDER FOR ORDERS & DELIVERIES
-        window.addOrderRow = (containerId = 'orderItemsContainer') => {
+        window.addOrderRow = (containerId = 'orderItemsContainer', val='', amount='') => {
             const container = document.getElementById(containerId);
             const row = document.createElement('div');
             row.className = 'flex gap-2 mb-2 order-row';
-            row.innerHTML = `<input type="text" list="stockItemsList" class="order-item w-[70%] p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none" placeholder="Item"><input type="text" class="order-amount w-[20%] p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none" placeholder="#"><button onclick="this.parentElement.remove()" class="w-[10%] text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>`;
+            row.innerHTML = `<input type="text" list="stockItemsList" value="${val}" class="order-item w-[70%] p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none" placeholder="Item"><input type="text" value="${amount}" class="order-amount w-[20%] p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none" placeholder="#"><button onclick="this.parentElement.remove()" class="w-[10%] text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>`;
             container.appendChild(row);
         };
 
@@ -1036,18 +1077,28 @@
             const items = []; rows.forEach(r => { const item = r.querySelector('.order-item').value.trim(); const amount = r.querySelector('.order-amount').value.trim(); if(item) items.push({item, amount}); });
             if(items.length === 0) return UI.toast('Agrega al menos un item', 'error');
             UI.closeModal();
-            await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'deliveries'), {
+            
+            const data = {
                 client: document.getElementById('delClient').value,
                 phone: document.getElementById('delPhone').value,
-                items, // Array of items
-                notes: document.getElementById('delNotes').value, // Comments
+                items, 
+                notes: document.getElementById('delNotes').value, 
                 when: document.getElementById('delWhen').value,
                 where: document.getElementById('delWhere').value,
-                status: 'pending',
                 branchOrigin: State.branch,
-                createdAt: serverTimestamp()
-            });
-            UI.toast('Reparto agendado', 'success');
+                updatedAt: serverTimestamp()
+            };
+            
+            const id = document.getElementById('delId').value;
+            if(id) {
+                await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'deliveries', id), data);
+                UI.toast('Reparto actualizado', 'success');
+            } else {
+                data.status = 'pending';
+                data.createdAt = serverTimestamp();
+                await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'deliveries'), data);
+                UI.toast('Reparto agendado', 'success');
+            }
         };
 
         document.getElementById('saveNoteBtn').onclick = async () => { const content = document.getElementById('noteContent').value.trim(); if(!content) return; UI.closeModal(); await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'notes'), { content, type: document.getElementById('noteType').value, branch: State.branch, createdAt: serverTimestamp() }); };
