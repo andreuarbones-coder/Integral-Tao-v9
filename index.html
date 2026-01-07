@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Jardín OS v9.0</title>
+    <title>Jardín OS v9.3</title>
     
     <!-- === MANIFIESTO PWA === -->
     <link rel="manifest" href='data:application/manifest+json,{"name":"Jardín OS","short_name":"Jardín OS","start_url":".","display":"standalone","background_color":"#1e293b","theme_color":"#0f172a","description":"Gestión Integral de Vivero","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1598/1598196.png","sizes":"192x192","type":"image/png"}]}'>
@@ -62,10 +62,6 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .scroll-area { height: calc(var(--app-height) - var(--header-height)); overflow-y: auto; padding-bottom: 80px; }
 
-        /* Custom UI Components */
-        .glass-panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.5); }
-        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); }
-        
         /* Chat Bubbles */
         .msg-bubble { max-width: 85%; border-radius: 16px; padding: 12px; margin-bottom: 8px; position: relative; word-wrap: break-word; }
         .msg-me { background-color: var(--secondary); margin-left: auto; color: var(--primary); border-bottom-right-radius: 4px; border: 1px solid rgba(0,0,0,0.05); }
@@ -75,11 +71,16 @@
         .spinner { border: 3px solid rgba(0,0,0,0.1); border-left-color: var(--accent); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        #toast-container { position: fixed; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 100; pointer-events: none; width: 90%; }
-        .toast { pointer-events: auto; animation: fade-in-down 0.3s ease-out; background: #1e293b; color: white; padding: 10px 20px; border-radius: 30px; font-size: 0.9rem; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        /* Toast Fix: Moved to Top Center to avoid FAB overlap */
+        #toast-container { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); z-index: 9999; pointer-events: none; width: auto; max-width: 90%; display: flex; flex-col-reverse; align-items: center; }
+        .toast { pointer-events: auto; animation: fade-in-down 0.3s ease-out; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(4px); color: white; padding: 10px 20px; border-radius: 50px; font-size: 0.9rem; font-weight: 600; display: flex; align-items: center; gap: 10px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2); margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.1); }
+        @keyframes fade-in-down { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body id="appBody" class="branch-centro transition-colors duration-500 font-sans text-slate-800">
+
+    <!-- === DATALIST FOR AUTOCOMPLETE === -->
+    <datalist id="stockItemsList"></datalist>
 
     <!-- === SIDEBAR NAVIGATION === -->
     <div id="sidebarOverlay" class="fixed inset-0 bg-black/50 z-40 hidden transition-opacity duration-300 opacity-0" onclick="UI.toggleSidebar(false)"></div>
@@ -91,7 +92,7 @@
                 </div>
                 <div>
                     <h2 class="font-bold text-lg leading-tight">Jardín OS</h2>
-                    <p class="text-xs opacity-80 font-mono">v9.0</p>
+                    <p class="text-xs opacity-80 font-mono">v9.3</p>
                 </div>
             </div>
             <div class="mt-4 pt-4 border-t border-white/20">
@@ -106,18 +107,21 @@
         <nav class="flex-grow overflow-y-auto py-4">
             <ul class="space-y-1">
                 <li><button onclick="UI.nav('tasks')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent active-nav"><i class="fas fa-tasks w-5"></i> Tareas</button></li>
-                <li><button onclick="UI.nav('standards')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-ruler-combined w-5"></i> Catálogo</button></li>
                 <li><button onclick="UI.nav('orders')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-shopping-basket w-5"></i> Pedidos <span id="badgeOrders" class="hidden bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-auto">!</span></button></li>
                 <li><button onclick="UI.nav('delivery')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-truck w-5"></i> Repartos <span id="badgeDelivery" class="hidden bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-auto">!</span></button></li>
+                <li><button onclick="UI.nav('standards')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-ruler-combined w-5"></i> Catálogo</button></li>
+                <li><button onclick="UI.nav('stock')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-boxes w-5"></i> Stock (Lista)</button></li>
                 <li><button onclick="UI.nav('scripts')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-comment-dots w-5"></i> Scripts Venta</button></li>
                 <li><button onclick="UI.nav('procedures')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-book w-5"></i> Procesos</button></li>
                 <li><button onclick="UI.nav('notes')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-sticky-note w-5"></i> Notas</button></li>
-                <li><button onclick="UI.nav('stock')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-cubes w-5"></i> Stock</button></li>
                 <li><button onclick="UI.nav('chat')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-walkie-talkie w-5"></i> Radio</button></li>
             </ul>
         </nav>
 
-        <div class="p-4 border-t border-slate-100">
+        <div class="p-4 border-t border-slate-100 space-y-2">
+            <button onclick="window.downloadBackup()" class="w-full py-2 px-3 rounded-lg bg-blue-50 text-blue-600 text-xs font-bold flex items-center justify-center gap-2 hover:bg-blue-100">
+                <i class="fas fa-cloud-download-alt"></i> <span>Backup de Datos</span>
+            </button>
             <button id="wakeLockBtn" class="w-full py-2 px-3 rounded-lg bg-slate-100 text-slate-500 text-xs font-bold flex items-center justify-center gap-2 transition-colors">
                 <i class="far fa-moon"></i> <span>Pantalla: Automática</span>
             </button>
@@ -154,7 +158,7 @@
                 </div>
             </div>
 
-            <!-- VIEW: STANDARDS (NUEVO) -->
+            <!-- VIEW: STANDARDS -->
             <div id="view-standards" class="view-section scroll-area hidden p-4">
                 <div class="sticky top-0 bg-slate-100 z-10 pb-4">
                     <div class="relative">
@@ -163,6 +167,7 @@
                     </div>
                 </div>
                 <div id="standardsList" class="space-y-6 pb-24"></div>
+                <button onclick="UI.openModal('modal-standards')" class="w-full py-3 bg-white border-2 border-dashed border-slate-300 text-slate-500 font-bold rounded-xl hover:border-emerald-500 hover:text-emerald-600 transition">+ Agregar Nueva Planta</button>
             </div>
 
             <!-- VIEW: ORDERS (PEDIDOS) -->
@@ -198,9 +203,16 @@
             </div>
 
             <!-- VIEW: STOCK -->
-            <div id="view-stock" class="view-section scroll-area hidden flex items-center justify-center flex-col opacity-50">
-                <i class="fas fa-tools text-6xl mb-4 text-slate-300"></i>
-                <p>Módulo de Stock en construcción</p>
+            <div id="view-stock" class="view-section scroll-area hidden p-4">
+                <div class="sticky top-0 bg-slate-100 z-10 pb-4">
+                     <div class="relative">
+                        <i class="fas fa-search absolute left-4 top-3.5 text-slate-400"></i>
+                        <input type="text" id="stockSearchInput" oninput="window.renderStockList(this.value)" class="w-full p-3 pl-10 rounded-xl border border-slate-300 shadow-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all" placeholder="Buscar en lista de stock...">
+                    </div>
+                </div>
+                <div id="stockListContainer" class="bg-white rounded-xl shadow-sm border border-slate-200 divide-y divide-slate-100 pb-24">
+                    <!-- Stock items go here -->
+                </div>
             </div>
 
             <!-- VIEW: CHAT -->
@@ -219,7 +231,7 @@
 
         </main>
 
-        <!-- FAB (Floating Action Button) -->
+        <!-- FAB -->
         <div id="fabContainer" class="fixed bottom-6 right-6 z-30 transition-transform duration-300 pb-[env(safe-area-inset-bottom)]">
             <button id="mainFab" class="w-14 h-14 rounded-full text-white shadow-xl flex items-center justify-center text-2xl active:scale-90 transition-transform hover:shadow-2xl" style="background-color: var(--accent);">
                 <i class="fas fa-plus"></i>
@@ -244,13 +256,12 @@
             </div>
         </div>
 
-        <!-- MODAL: STANDARDS (NUEVO) -->
+        <!-- MODAL: STANDARDS -->
         <div id="modal-standards" class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden hidden transform transition-transform duration-300 translate-y-full sm:translate-y-0">
             <div class="p-5">
                 <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><i class="fas fa-ruler-combined text-emerald-600"></i> Definir Estándar</h2>
-                
+                <input type="hidden" id="stdId">
                 <div class="space-y-4">
-                    <!-- Foto -->
                     <div class="border-2 border-dashed border-slate-300 rounded-xl p-4 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition relative" onclick="document.getElementById('stdPhotoInput').click()">
                         <input type="file" id="stdPhotoInput" accept="image/*" class="hidden" onchange="window.previewStdImage(this)">
                         <div id="stdPhotoPreview" class="hidden w-full h-40 bg-cover bg-center rounded-lg shadow-sm"></div>
@@ -259,16 +270,9 @@
                             <span class="text-sm font-bold">Toca para subir Foto Testigo</span>
                         </div>
                     </div>
-
-                    <!-- Especie -->
+                    <div><label class="text-xs font-bold text-slate-400 uppercase ml-1">Especie</label><input type="text" id="stdSpecies" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none font-bold" placeholder="Ej: Jazmín del Cabo"></div>
                     <div>
-                        <label class="text-xs font-bold text-slate-400 uppercase ml-1">Especie</label>
-                        <input type="text" id="stdSpecies" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none font-bold" placeholder="Ej: Jazmín del Cabo">
-                    </div>
-
-                    <!-- Tamaño -->
-                    <div>
-                        <label class="text-xs font-bold text-slate-400 uppercase ml-1">Tamaño (Etiqueta)</label>
+                        <label class="text-xs font-bold text-slate-400 uppercase ml-1">Tamaño</label>
                         <div class="flex gap-2 overflow-x-auto no-scrollbar py-1">
                             <label class="cursor-pointer"><input type="radio" name="stdSize" value="T1" class="peer sr-only" checked><div class="px-4 py-2 bg-slate-100 rounded-lg text-slate-500 font-bold peer-checked:bg-emerald-600 peer-checked:text-white transition">T1</div></label>
                             <label class="cursor-pointer"><input type="radio" name="stdSize" value="T2" class="peer sr-only"><div class="px-4 py-2 bg-slate-100 rounded-lg text-slate-500 font-bold peer-checked:bg-emerald-600 peer-checked:text-white transition">T2</div></label>
@@ -277,24 +281,16 @@
                             <label class="cursor-pointer"><input type="radio" name="stdSize" value="T5" class="peer sr-only"><div class="px-4 py-2 bg-slate-100 rounded-lg text-slate-500 font-bold peer-checked:bg-emerald-600 peer-checked:text-white transition">T5</div></label>
                         </div>
                     </div>
-
-                    <!-- Medidas -->
                     <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="text-xs font-bold text-slate-400 uppercase ml-1">Altura</label>
-                            <input type="text" id="stdHeight" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none" placeholder="Ej: 80cm">
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-slate-400 uppercase ml-1">Tronco / Base</label>
-                            <input type="text" id="stdDiameter" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none" placeholder="Ej: 3cm">
-                        </div>
+                        <div><label class="text-xs font-bold text-slate-400 uppercase ml-1">Altura</label><input type="text" id="stdHeight" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none" placeholder="Ej: 80cm"></div>
+                        <div><label class="text-xs font-bold text-slate-400 uppercase ml-1">Tronco</label><input type="text" id="stdDiameter" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none" placeholder="Ej: 3cm"></div>
                     </div>
                 </div>
                 <button id="saveStdBtn" class="w-full mt-6 py-3.5 bg-emerald-600 text-white rounded-xl shadow-lg font-bold active:scale-95 transition-transform">Guardar Estándar</button>
             </div>
         </div>
 
-        <!-- MODAL: TASK (CREATE/EDIT) -->
+        <!-- MODAL: TASK -->
         <div id="modal-tasks" class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden hidden transform transition-transform duration-300 translate-y-full sm:translate-y-0">
             <div class="p-5">
                 <div class="flex justify-between items-center mb-4">
@@ -320,9 +316,8 @@
                             <select id="taskCycle" class="bg-transparent w-full outline-none text-sm font-medium text-slate-700">
                                 <option value="none">No cíclica (Una vez)</option>
                                 <option value="daily">Todos los días</option>
-                                <option value="weekly">Semanal (7 días)</option>
+                                <option value="weekly">Semanal</option>
                                 <option value="monthly">Mensual</option>
-                                <option value="quarterly">Cada 3 meses</option>
                             </select>
                         </div>
                     </div>
@@ -332,10 +327,10 @@
             </div>
         </div>
 
-        <!-- MODAL: ORDER (PEDIDOS) -->
+        <!-- MODAL: ORDER & DELIVERY (SHARED STRUCTURE) -->
         <div id="modal-orders" class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden hidden transform transition-transform duration-300 translate-y-full sm:translate-y-0">
             <div class="p-5 flex flex-col h-[80vh] sm:h-auto">
-                <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2 flex-none"><i class="fas fa-shopping-basket text-blue-600"></i> Nuevo Pedido</h2>
+                <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2 flex-none" id="orderModalTitle"><i class="fas fa-shopping-basket text-blue-600"></i> Nuevo Pedido</h2>
                 
                 <div class="flex-grow overflow-y-auto pr-2 space-y-2 mb-4" id="orderItemsContainer">
                     <!-- Dynamic Rows -->
@@ -345,30 +340,40 @@
 
                 <div class="flex-none space-y-3">
                     <input type="text" id="orderRequester" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none text-sm" placeholder="¿Quién solicita?">
-                    <textarea id="orderNotes" rows="2" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none text-sm" placeholder="Notas del pedido (opcional)"></textarea>
-                    <button id="saveOrderBtn" class="w-full py-3.5 bg-blue-600 text-white rounded-xl shadow-lg font-bold active:scale-95">Enviar Solicitud</button>
+                    <textarea id="orderNotes" rows="2" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none text-sm" placeholder="Notas/Comentarios (opcional)"></textarea>
+                    <button id="saveOrderBtn" class="w-full py-3.5 bg-blue-600 text-white rounded-xl shadow-lg font-bold active:scale-95">Confirmar</button>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL: DELIVERY -->
+        <!-- MODAL: DELIVERY (NOW REUSES ORDER LOGIC MODIFIED) -->
         <div id="modal-delivery" class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden hidden transform transition-transform duration-300 translate-y-full sm:translate-y-0">
-            <div class="p-5">
-                <h2 class="text-xl font-bold text-slate-800 mb-4">Nuevo Reparto</h2>
-                <div class="space-y-3">
+            <div class="p-5 flex flex-col h-[80vh] sm:h-auto">
+                <h2 class="text-xl font-bold text-slate-800 mb-4 flex-none">Nuevo Reparto</h2>
+                
+                <div class="flex-none space-y-3 mb-4">
                     <input type="text" id="delClient" class="w-full p-3 bg-slate-50 rounded-xl outline-none border border-slate-200" placeholder="Cliente">
-                    <input type="tel" id="delPhone" class="w-full p-3 bg-slate-50 rounded-xl outline-none border border-slate-200" placeholder="Teléfono">
-                    <textarea id="delItems" rows="3" class="w-full p-3 bg-slate-50 rounded-xl outline-none border border-slate-200" placeholder="Items a entregar..."></textarea>
                     <div class="grid grid-cols-2 gap-3">
-                        <input type="text" id="delWhen" class="p-3 bg-slate-50 rounded-xl text-sm border border-slate-200" placeholder="¿Cuándo?">
-                        <input type="text" id="delWhere" class="p-3 bg-slate-50 rounded-xl text-sm border border-slate-200" placeholder="Dirección">
+                        <input type="tel" id="delPhone" class="p-3 bg-slate-50 rounded-xl outline-none border border-slate-200 text-sm" placeholder="Teléfono">
+                        <input type="text" id="delWhen" class="p-3 bg-slate-50 rounded-xl outline-none border border-slate-200 text-sm" placeholder="Horario">
                     </div>
+                    <input type="text" id="delWhere" class="w-full p-3 bg-slate-50 rounded-xl outline-none border border-slate-200 text-sm" placeholder="Dirección">
                 </div>
-                <button id="saveDelBtn" class="w-full mt-6 py-3.5 bg-indigo-600 text-white rounded-xl shadow-lg font-bold active:scale-95">Agendar Reparto</button>
+
+                <label class="text-xs font-bold text-slate-400 uppercase mb-2 block">Items a entregar</label>
+                <div class="flex-grow overflow-y-auto pr-2 space-y-2 mb-4" id="delItemsContainer">
+                    <!-- Dynamic Rows -->
+                </div>
+                <button onclick="window.addOrderRow('delItemsContainer')" class="mb-4 py-2 px-4 rounded-lg border-2 border-dashed border-slate-300 text-slate-500 font-bold hover:border-indigo-400 hover:text-indigo-500 transition-colors w-full">+ Agregar Ítem</button>
+
+                <div class="flex-none">
+                    <textarea id="delNotes" rows="2" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none text-sm mb-3" placeholder="Comentarios del reparto (Timbre, etc)"></textarea>
+                    <button id="saveDelBtn" class="w-full py-3.5 bg-indigo-600 text-white rounded-xl shadow-lg font-bold active:scale-95">Agendar Reparto</button>
+                </div>
             </div>
         </div>
 
-        <!-- MODAL: SCRIPT (NUEVO) -->
+        <!-- MODAL: SCRIPT -->
         <div id="modal-scripts" class="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden hidden transform transition-transform duration-300 translate-y-full sm:translate-y-0">
             <div class="p-5">
                 <h2 class="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><i class="fas fa-comment-dots text-purple-600"></i> Nuevo Script</h2>
@@ -421,7 +426,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, orderBy, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, serverTimestamp, query, orderBy, where, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // CONFIG
@@ -433,7 +438,21 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const storage = getStorage(app);
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'jardin-os-v8';
+        const APP_ID = 'jardin-os-v8'; 
+
+        // === STOCK DATA (EXTRACTED) ===
+        const STOCK_DATA = [
+            "HORMIGUICIDA MIREX X 500 GR", "AGLAONEMA BAHIA DE PLATA M12", "ALOE VERA M12", "MACETA COMUN 24", 
+            "OPUNTIA T1", "DENIS 35", "HELECHO MACHO M 35", "CEBOLLA DE LA SUERTE CHICA", "CUADRO 31X31 SIN PLANTA",
+            "SUSTRATO", "FERTILIZANTE", "TUTOR", "MACETA PLASTICO", "MACETA BARRO", "SEMILLAS"
+        ];
+        // Populate Datalist
+        const datalist = document.getElementById('stockItemsList');
+        STOCK_DATA.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item;
+            datalist.appendChild(option);
+        });
 
         // STATE
         const State = {
@@ -452,15 +471,9 @@
                 this.nav('tasks');
                 document.getElementById('currentDate').innerText = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
                 
-                // Username Check
-                if (!State.username) {
-                    setTimeout(() => {
-                        const modal = document.getElementById('modal-username');
-                        modal.classList.remove('hidden');
-                    }, 500);
-                }
+                if (!State.username) setTimeout(() => document.getElementById('modal-username').classList.remove('hidden'), 500);
 
-                // Event Listeners
+                // Listeners
                 document.getElementById('branchToggleBtn').onclick = () => this.toggleBranch();
                 document.querySelectorAll('.modal-close').forEach(b => b.onclick = () => this.closeModal());
                 document.getElementById('modalOverlay').onclick = (e) => { if(e.target === document.getElementById('modalOverlay')) this.closeModal(); };
@@ -477,6 +490,9 @@
                         this.toast(`Bienvenido, ${name}`);
                     }
                 };
+
+                // Render initial stock list
+                this.renderStockList('');
             },
 
             setBranch(branch) {
@@ -497,9 +513,7 @@
                 this.toast(`Cambiado a ${label.innerText}`);
             },
 
-            toggleBranch() {
-                this.setBranch(State.branch === 'centro' ? 'ejemplares' : 'centro');
-            },
+            toggleBranch() { this.setBranch(State.branch === 'centro' ? 'ejemplares' : 'centro'); },
 
             toggleSidebar(show) {
                 const sidebar = document.getElementById('sidebar');
@@ -590,23 +604,19 @@
                 
                 if (id === 'modal-orders') {
                     document.getElementById('orderItemsContainer').innerHTML = '';
-                    window.addOrderRow(); 
+                    window.addOrderRow('orderItemsContainer'); 
                     document.getElementById('orderRequester').value = State.username || '';
                     document.getElementById('orderNotes').value = '';
                 }
 
-                if (id === 'modal-scripts') {
-                    document.getElementById('scriptTitle').value = '';
-                    document.getElementById('scriptContent').value = '';
-                }
-
-                if (id === 'modal-standards') {
-                    document.getElementById('stdSpecies').value = '';
-                    document.getElementById('stdHeight').value = '';
-                    document.getElementById('stdDiameter').value = '';
-                    document.getElementById('stdPhotoPreview').classList.add('hidden');
-                    document.getElementById('stdPhotoPlaceholder').classList.remove('hidden');
-                    document.getElementById('stdPhotoInput').value = '';
+                if (id === 'modal-delivery') {
+                    document.getElementById('delItemsContainer').innerHTML = '';
+                    window.addOrderRow('delItemsContainer');
+                    document.getElementById('delClient').value = '';
+                    document.getElementById('delPhone').value = '';
+                    document.getElementById('delWhen').value = '';
+                    document.getElementById('delWhere').value = '';
+                    document.getElementById('delNotes').value = '';
                 }
             },
 
@@ -648,12 +658,29 @@
                 if(el) el.scrollTop = el.scrollHeight;
             },
 
-            // --- STANDARDS RENDER LOGIC ---
+            renderStockList(query) {
+                const container = document.getElementById('stockListContainer');
+                container.innerHTML = '';
+                const term = query.toLowerCase();
+                const filtered = STOCK_DATA.filter(item => item.toLowerCase().includes(term));
+                
+                if (filtered.length === 0) {
+                    container.innerHTML = '<div class="p-4 text-center text-slate-400 text-sm">No encontrado en el catálogo</div>';
+                    return;
+                }
+
+                filtered.slice(0, 50).forEach(item => { // Limit to 50 for performance
+                    const div = document.createElement('div');
+                    div.className = "p-3 text-sm text-slate-700 hover:bg-slate-50";
+                    div.innerText = item;
+                    container.appendChild(div);
+                });
+            },
+
+            // --- STANDARDS RENDER ---
             renderStandards(list) {
                 const container = document.getElementById('standardsList');
                 container.innerHTML = '';
-                
-                // Group by species
                 const groups = {};
                 list.forEach(item => {
                     const species = item.species.toLowerCase();
@@ -667,29 +694,22 @@
                 }
 
                 Object.values(groups).forEach(group => {
-                    // Sort variants T1, T2...
                     group.variants.sort((a, b) => a.sizeLabel.localeCompare(b.sizeLabel));
-                    
                     const card = document.createElement('div');
                     card.className = "bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden std-card";
-                    card.dataset.species = group.name.toLowerCase(); // For search
+                    card.dataset.species = group.name.toLowerCase(); 
 
-                    // Initial state is the first variant
                     const initial = group.variants[0];
-                    const tabsHtml = group.variants.map((v, idx) => `
-                        <button onclick="window.switchStdTab(this, '${v.photoUrl}', '${v.height}', '${v.diameter}', '${v.author}', '${v.id}')" 
-                            class="px-3 py-1 rounded-lg text-sm font-bold transition-colors ${idx === 0 ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">
-                            ${v.sizeLabel}
-                        </button>
-                    `).join('');
+                    const imgUrl = initial.photoUrl || 'https://placehold.co/600x400/e2e8f0/94a3b8?text=Sin+Foto';
+                    const tabsHtml = group.variants.map((v, idx) => `<button onclick="window.switchStdTab(this, '${v.photoUrl||''}', '${v.height}', '${v.diameter}', '${v.author}', '${v.id}')" class="px-3 py-1 rounded-lg text-sm font-bold transition-colors ${idx === 0 ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}">${v.sizeLabel}</button>`).join('');
 
                     card.innerHTML = `
                         <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <h3 class="font-bold text-slate-800 capitalize text-lg">${group.name}</h3>
-                            <div class="flex gap-2">${tabsHtml}</div>
+                            <div class="flex gap-2 overflow-x-auto no-scrollbar">${tabsHtml}</div>
                         </div>
                         <div class="relative">
-                            <img src="${initial.photoUrl}" class="w-full h-64 object-cover std-img" id="img-${initial.id}">
+                            <img src="${imgUrl}" class="w-full h-64 object-cover std-img" id="img-${initial.id}">
                             <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-4 pt-12 text-white">
                                 <div class="flex justify-between items-end">
                                     <div id="info-${initial.id}">
@@ -717,7 +737,6 @@
                 });
             },
 
-            // --- EXISTING RENDERS ---
             renderTasks(tasks) {
                 const list = document.getElementById('taskList');
                 list.innerHTML = '';
@@ -734,30 +753,6 @@
                     const div = document.createElement('div');
                     div.className = `bg-white rounded-xl p-4 shadow-sm border-l-4 ${prioColor[t.priority] || 'border-l-slate-300'} flex gap-3 transition-all ${isDone ? 'opacity-50' : ''}`;
                     
-                    const buttons = `
-                        <div class="flex flex-col gap-2 pt-1 border-l border-slate-100 pl-3">
-                            ${!isDone ? `
-                                <button onclick="window.updateTaskStatus('${t.id}', 'done')" class="w-8 h-8 rounded-full bg-slate-100 text-slate-300 hover:bg-emerald-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-90" title="Completar">
-                                    <i class="fas fa-check"></i>
-                                </button>
-                                ${!isPartial ? `
-                                <button onclick="window.updateTaskStatus('${t.id}', 'partial')" class="w-8 h-8 rounded-full bg-slate-50 text-slate-300 hover:bg-amber-400 hover:text-white flex items-center justify-center transition-all active:scale-90" title="Marcar Incompleto">
-                                    <i class="fas fa-hourglass-half text-xs"></i>
-                                </button>
-                                ` : ''}
-                            ` : `
-                                <button onclick="window.updateTaskStatus('${t.id}', 'pending')" class="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md active:scale-90" title="Deshacer / Volver a Pendiente">
-                                    <i class="fas fa-undo"></i>
-                                </button>
-                            `}
-                            ${isPartial ? `
-                                <button onclick="window.updateTaskStatus('${t.id}', 'pending')" class="w-8 h-8 rounded-full bg-amber-400 text-white flex items-center justify-center shadow-md animate-pulse active:scale-90" title="Volver a Pendiente">
-                                    <i class="fas fa-undo"></i>
-                                </button>
-                            ` : ''}
-                        </div>
-                    `;
-
                     div.innerHTML = `
                         <div class="flex-grow">
                             <div class="flex items-center gap-2 mb-1">
@@ -771,7 +766,12 @@
                                 <button onclick='window.editTask(${JSON.stringify(t)})' class="text-slate-300 hover:text-slate-500 px-2"><i class="fas fa-ellipsis-h"></i></button>
                             </div>
                         </div>
-                        ${buttons}
+                        <div class="flex flex-col gap-2 pt-1 border-l border-slate-100 pl-3">
+                            ${!isDone ? `
+                                <button onclick="window.updateTaskStatus('${t.id}', 'done')" class="w-8 h-8 rounded-full bg-slate-100 text-slate-300 hover:bg-emerald-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-90" title="Completar"><i class="fas fa-check"></i></button>
+                                ${!isPartial ? `<button onclick="window.updateTaskStatus('${t.id}', 'partial')" class="w-8 h-8 rounded-full bg-slate-50 text-slate-300 hover:bg-amber-400 hover:text-white flex items-center justify-center transition-all active:scale-90" title="Marcar Incompleto"><i class="fas fa-hourglass-half text-xs"></i></button>` : ''}
+                            ` : `<button onclick="window.updateTaskStatus('${t.id}', 'pending')" class="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md active:scale-90" title="Volver a Pendiente"><i class="fas fa-undo"></i></button>`}
+                        </div>
                     `;
                     list.appendChild(div);
                 });
@@ -792,30 +792,20 @@
 
                 orders.forEach(o => {
                     const isReceived = o.status === 'received';
-                    const isOrdered = o.status === 'ordered';
                     
                     const div = document.createElement('div');
                     div.className = `bg-white rounded-xl p-4 shadow-sm border border-slate-200 relative ${isReceived ? 'opacity-60 bg-slate-50' : ''}`;
                     
-                    let statusBadge = '';
-                    if(isReceived) statusBadge = '<span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded font-bold">RECIBIDO</span>';
-                    else if(isOrdered) statusBadge = '<span class="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-bold">COMPRADO</span>';
-                    else statusBadge = '<span class="bg-slate-100 text-slate-500 text-xs px-2 py-1 rounded font-bold">PENDIENTE</span>';
+                    let statusBadge = isReceived ? '<span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-1 rounded font-bold">RECIBIDO</span>' : 
+                                      (o.status === 'ordered' ? '<span class="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded font-bold">COMPRADO</span>' : '<span class="bg-slate-100 text-slate-500 text-xs px-2 py-1 rounded font-bold">PENDIENTE</span>');
 
                     let itemsHtml = '';
                     if (Array.isArray(o.items)) {
-                        itemsHtml = `<div class="bg-slate-50 rounded-lg overflow-hidden my-2 border border-slate-100">
-                            ${o.items.map(i => `<div class="flex justify-between p-2 border-b border-slate-100 last:border-0 text-sm"><span class="font-medium text-slate-700">${i.item}</span><span class="text-slate-500">x${i.amount}</span></div>`).join('')}
-                        </div>`;
-                    } else {
-                        itemsHtml = `<div class="mb-2"><span class="font-bold text-lg text-slate-800">${o.item}</span> <span class="text-sm text-slate-500">x${o.amount}</span></div>`;
-                    }
+                        itemsHtml = `<div class="bg-slate-50 rounded-lg overflow-hidden my-2 border border-slate-100">${o.items.map(i => `<div class="flex justify-between p-2 border-b border-slate-100 last:border-0 text-sm"><span class="font-medium text-slate-700">${i.item}</span><span class="text-slate-500">x${i.amount}</span></div>`).join('')}</div>`;
+                    } else { itemsHtml = `<div class="mb-2"><span class="font-bold text-lg text-slate-800">${o.item}</span> <span class="text-sm text-slate-500">x${o.amount}</span></div>`; }
 
                     div.innerHTML = `
-                        <div class="flex justify-between items-center mb-2">
-                             <span class="text-xs font-bold text-slate-400 uppercase">Pedido</span>
-                            ${statusBadge}
-                        </div>
+                        <div class="flex justify-between items-center mb-2"><span class="text-xs font-bold text-slate-400 uppercase">Pedido</span>${statusBadge}</div>
                         ${itemsHtml}
                         ${o.notes ? `<p class="text-xs text-slate-500 italic mb-2"><i class="fas fa-comment-alt mr-1"></i>${o.notes}</p>` : ''}
                         <div class="flex justify-between items-center text-xs text-slate-400 mt-2 border-t border-slate-100 pt-2">
@@ -833,10 +823,17 @@
             renderDeliveries(items) {
                 const list = document.getElementById('deliveryList');
                 list.innerHTML = '';
-                const pending = items.filter(i => i.status === 'pending').length;
-                document.getElementById('badgeDelivery').classList.toggle('hidden', pending === 0);
+                const pendingCount = items.filter(i => i.status === 'pending').length;
+                document.getElementById('badgeDelivery').classList.toggle('hidden', pendingCount === 0);
                 
                 if(items.length === 0) { list.innerHTML = this.emptyState('truck', 'Nada para repartir'); return; }
+
+                // Sort: Pending first, then by date desc (Newest pending at top of their section)
+                items.sort((a,b) => {
+                    if (a.status === 'pending' && b.status !== 'pending') return -1;
+                    if (a.status !== 'pending' && b.status === 'pending') return 1;
+                    return (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0);
+                });
 
                 items.forEach(d => {
                     const isDone = d.status === 'delivered';
@@ -844,21 +841,25 @@
                     const div = document.createElement('div');
                     div.className = `bg-white rounded-xl shadow-sm border overflow-hidden ${isDone ? 'opacity-50 border-slate-200' : isIncomplete ? 'border-orange-200 bg-orange-50' : 'border-slate-200'}`;
                     
+                    const time = d.createdAt ? new Date(d.createdAt.seconds*1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '';
+                    
+                    let itemsHtml = '';
+                    if (Array.isArray(d.items)) {
+                        itemsHtml = `<div class="bg-slate-50 rounded-lg p-2 text-sm text-slate-700 mb-3 border border-slate-100">${d.items.map(i => `<div class="flex justify-between border-b border-slate-200 last:border-0 py-1"><span>${i.item}</span><span class="font-bold">x${i.amount}</span></div>`).join('')}</div>`;
+                    } else { itemsHtml = `<div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-700 italic mb-3">${d.items}</div>`; }
+
                     div.innerHTML = `
                         <div class="p-4">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <h3 class="font-bold text-slate-900">${d.client}</h3>
-                                    <a href="tel:${d.phone}" class="text-emerald-600 text-sm font-bold flex items-center gap-1"><i class="fas fa-phone"></i> ${d.phone}</a>
-                                </div>
+                            <div class="flex justify-between items-start mb-2">
+                                <h3 class="font-bold text-slate-900">${d.client}</h3>
                                 <div class="text-right">
                                     <span class="block text-xs font-bold text-slate-500 uppercase tracking-wide">${d.status === 'pending' ? 'Pendiente' : d.status === 'delivered' ? 'Entregado' : 'Incompleto'}</span>
-                                    <span class="text-[10px] text-slate-400">${new Date(d.createdAt.seconds*1000).toLocaleDateString()}</span>
+                                    <span class="text-[10px] text-slate-400">${time}hs</span>
                                 </div>
                             </div>
-                            <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-700 italic mb-3">
-                                ${d.items}
-                            </div>
+                            <a href="tel:${d.phone}" class="text-emerald-600 text-sm font-bold flex items-center gap-1 mb-2"><i class="fas fa-phone"></i> ${d.phone}</a>
+                            ${itemsHtml}
+                            ${d.notes ? `<p class="text-xs text-amber-600 bg-amber-50 p-2 rounded mb-3 border border-amber-100"><i class="fas fa-exclamation-circle"></i> ${d.notes}</p>` : ''}
                             <div class="flex gap-4 text-xs text-slate-500 font-medium">
                                 <span class="flex items-center gap-1"><i class="far fa-clock"></i> ${d.when}</span>
                                 <span class="flex items-center gap-1 text-blue-500"><i class="fas fa-map-marker-alt"></i> ${d.where}</span>
@@ -867,9 +868,7 @@
                         <div class="bg-slate-50 border-t border-slate-100 p-2 flex justify-between items-center">
                             <button onclick="window.delShared('deliveries', '${d.id}')" class="text-xs text-red-400 px-2">ELIMINAR</button>
                             <div class="flex gap-2">
-                                ${(isDone || isIncomplete) ? 
-                                    `<button onclick="window.updateDelStatus('${d.id}', 'pending')" class="px-3 py-1 bg-slate-200 text-slate-600 rounded text-xs font-bold" title="Volver a Pendiente"><i class="fas fa-undo"></i></button>` 
-                                    : ''}
+                                ${(isDone || isIncomplete) ? `<button onclick="window.updateDelStatus('${d.id}', 'pending')" class="px-3 py-1 bg-slate-200 text-slate-600 rounded text-xs font-bold" title="Volver a Pendiente"><i class="fas fa-undo"></i></button>` : ''}
                                 ${d.status !== 'incomplete' ? `<button onclick="window.updateDelStatus('${d.id}', 'incomplete')" class="px-3 py-1 bg-orange-100 text-orange-600 rounded text-xs font-bold">Incompleto</button>` : ''}
                                 ${d.status !== 'delivered' ? `<button onclick="window.updateDelStatus('${d.id}', 'delivered')" class="px-3 py-1 bg-emerald-100 text-emerald-600 rounded text-xs font-bold">Entregado</button>` : ''}
                             </div>
@@ -898,9 +897,7 @@
             renderScripts(scripts) {
                 const list = document.getElementById('scriptsList');
                 list.innerHTML = '';
-                
                 if(scripts.length === 0) { list.innerHTML = this.emptyState('comment-dots', 'Sin scripts de venta'); return; }
-
                 scripts.forEach(s => {
                     const div = document.createElement('div');
                     div.className = "bg-white rounded-xl shadow-sm border border-purple-100 p-4";
@@ -909,12 +906,8 @@
                             <h3 class="font-bold text-slate-800 text-lg">${s.title}</h3>
                             <button onclick="window.delShared('scripts', '${s.id}')" class="text-slate-300 hover:text-red-400"><i class="fas fa-trash"></i></button>
                         </div>
-                        <div class="bg-slate-50 p-3 rounded-lg text-sm text-slate-600 mb-3 font-mono leading-relaxed border border-slate-100">
-                            ${s.content}
-                        </div>
-                        <button onclick="window.copyScript('${s.content.replace(/'/g, "\\'")}')" class="w-full py-2 bg-purple-100 text-purple-700 font-bold rounded-lg hover:bg-purple-200 transition flex items-center justify-center gap-2 active:scale-95">
-                            <i class="far fa-copy"></i> Copiar
-                        </button>
+                        <div class="bg-slate-50 p-3 rounded-lg text-sm text-slate-600 mb-3 font-mono leading-relaxed border border-slate-100">${s.content}</div>
+                        <button onclick="window.copyScript('${s.content.replace(/'/g, "\\'")}')" class="w-full py-2 bg-purple-100 text-purple-700 font-bold rounded-lg hover:bg-purple-200 transition flex items-center justify-center gap-2 active:scale-95"><i class="far fa-copy"></i> Copiar</button>
                     `;
                     list.appendChild(div);
                 });
@@ -923,26 +916,13 @@
             renderProcedures(procs) {
                 const list = document.getElementById('proceduresList');
                 list.innerHTML = '';
-                const colors = { 
-                    blue: 'bg-blue-50 border-blue-200 text-blue-900', 
-                    green: 'bg-emerald-50 border-emerald-200 text-emerald-900', 
-                    red: 'bg-red-50 border-red-200 text-red-900', 
-                    purple: 'bg-purple-50 border-purple-200 text-purple-900',
-                    pink: 'bg-pink-50 border-pink-200 text-pink-900',
-                    teal: 'bg-teal-50 border-teal-200 text-teal-900',
-                    slate: 'bg-slate-100 border-slate-300 text-slate-800'
-                };
-                
+                const colors = { blue: 'bg-blue-50 border-blue-200 text-blue-900', green: 'bg-emerald-50 border-emerald-200 text-emerald-900', red: 'bg-red-50 border-red-200 text-red-900', purple: 'bg-purple-50 border-purple-200 text-purple-900', pink: 'bg-pink-50 border-pink-200 text-pink-900', teal: 'bg-teal-50 border-teal-200 text-teal-900', slate: 'bg-slate-100 border-slate-300 text-slate-800' };
                 procs.forEach(p => {
                     const style = colors[p.color] || colors.blue;
                     const steps = p.steps.split('\n').map(s => `<li class="flex items-start gap-2 mb-1"><span class="mt-1.5 w-1.5 h-1.5 rounded-full bg-current opacity-50 flex-shrink-0"></span><span>${s.replace(/^- /, '')}</span></li>`).join('');
                     const div = document.createElement('div');
                     div.className = `rounded-xl shadow-sm border p-5 relative ${style}`;
-                    div.innerHTML = `
-                        <h3 class="font-bold text-lg mb-3 flex items-center gap-2"><i class="fas fa-clipboard-check opacity-50"></i> ${p.title}</h3>
-                        <ul class="text-sm opacity-90 leading-relaxed">${steps}</ul>
-                        <button onclick="window.delShared('procedures', '${p.id}')" class="absolute top-4 right-4 opacity-30 hover:opacity-100 hover:text-red-600 transition"><i class="fas fa-trash"></i></button>
-                    `;
+                    div.innerHTML = `<h3 class="font-bold text-lg mb-3 flex items-center gap-2"><i class="fas fa-clipboard-check opacity-50"></i> ${p.title}</h3><ul class="text-sm opacity-90 leading-relaxed">${steps}</ul><button onclick="window.delShared('procedures', '${p.id}')" class="absolute top-4 right-4 opacity-30 hover:opacity-100 hover:text-red-600 transition"><i class="fas fa-trash"></i></button>`;
                     list.appendChild(div);
                 });
             },
@@ -954,14 +934,11 @@
                     const isMe = m.sender === State.user.uid;
                     const div = document.createElement('div');
                     div.className = `msg-bubble ${isMe ? 'msg-me' : 'msg-other'}`;
-                    
                     let content = '';
                     if(m.type === 'text') content = `<p>${m.text}</p>`;
                     if(m.type === 'image') content = `<img src="${m.url}" class="rounded-lg max-h-48 w-full object-cover" onclick="window.open(this.src)">`;
-                    
                     const time = m.createdAt ? new Date(m.createdAt.seconds*1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '...';
                     const author = (!isMe && m.author) ? `<div class="text-[10px] font-bold opacity-60 mb-1 text-emerald-600">${m.author}</div>` : '';
-
                     div.innerHTML = `${author}${content}<div class="text-[10px] text-right mt-1 opacity-50">${time}</div>`;
                     list.appendChild(div);
                 });
@@ -979,62 +956,37 @@
 
             resubscribe() {
                 Object.values(State.listeners).forEach(u => u && u());
-
                 State.listeners.tasks = onSnapshot(this.getCol('tasks'), (snap) => {
                     const tasks = []; 
-                    snap.forEach(d => {
-                        const data = d.data();
-                        if (data.branch === State.branch) tasks.push({id: d.id, ...data});
-                    });
+                    snap.forEach(d => { if (d.data().branch === State.branch) tasks.push({id: d.id, ...d.data()}); });
                     const pVal = {critical:0, high:1, medium:2, low:3};
-                    tasks.sort((a,b) => {
-                        if(pVal[a.priority] !== pVal[b.priority]) return pVal[a.priority] - pVal[b.priority];
-                        return (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0);
-                    });
+                    tasks.sort((a,b) => { if(pVal[a.priority] !== pVal[b.priority]) return pVal[a.priority] - pVal[b.priority]; return (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0); });
                     UI.renderTasks(tasks);
                 });
-
                 State.listeners.notes = onSnapshot(this.getCol('notes'), (snap) => {
-                    const items = []; 
-                    snap.forEach(d => {
-                        const data = d.data();
-                        if (data.branch === State.branch) items.push({id: d.id, ...data});
-                    });
+                    const items = []; snap.forEach(d => { if (d.data().branch === State.branch) items.push({id: d.id, ...d.data()}); });
                     UI.renderNotes(items.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)));
                 });
-
                 State.listeners.chat = onSnapshot(this.getCol('chat'), (snap) => {
-                    const items = []; 
-                    snap.forEach(d => {
-                        const data = d.data();
-                        if (data.branch === State.branch) items.push({id: d.id, ...data});
-                    });
-                    items.sort((a,b) => (a.createdAt?.seconds||0)-(b.createdAt?.seconds||0));
-                    UI.renderChat(items);
-                    UI.scrollToBottom('chatList');
+                    const items = []; snap.forEach(d => { if (d.data().branch === State.branch) items.push({id: d.id, ...d.data()}); });
+                    UI.renderChat(items.sort((a,b) => (a.createdAt?.seconds||0)-(b.createdAt?.seconds||0)));
                 });
-
                 State.listeners.delivery = onSnapshot(this.getCol('deliveries'), (snap) => {
                     const items = []; snap.forEach(d => items.push({id: d.id, ...d.data()}));
-                    UI.renderDeliveries(items.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)));
+                    UI.renderDeliveries(items); // Sorting handled in render
                 });
-
                 State.listeners.procedures = onSnapshot(this.getCol('procedures'), (snap) => {
                     const items = []; snap.forEach(d => items.push({id: d.id, ...d.data()}));
                     UI.renderProcedures(items.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)));
                 });
-
                 State.listeners.scripts = onSnapshot(this.getCol('scripts'), (snap) => {
                     const items = []; snap.forEach(d => items.push({id: d.id, ...d.data()}));
                     UI.renderScripts(items.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)));
                 });
-
-                // Shared: Standards
                 State.listeners.standards = onSnapshot(this.getCol('standards'), (snap) => {
                     const items = []; snap.forEach(d => items.push({id: d.id, ...d.data()}));
                     UI.renderStandards(items);
                 });
-
                 State.listeners.orders = onSnapshot(this.getCol('orders'), (snap) => {
                     const items = []; snap.forEach(d => items.push({id: d.id, ...d.data()}));
                     UI.renderOrders(items.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)));
@@ -1043,284 +995,71 @@
         };
 
         // GLOBAL ACTIONS
-        window.updateTaskStatus = async (id, status) => {
-            try { await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id), { status }); } catch(e) { UI.toast('Error', 'error'); }
-        };
+        window.updateTaskStatus = async (id, status) => { try { await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id), { status }); } catch(e) { UI.toast('Error', 'error'); } };
         window.editTask = (task) => { UI.openModal('modal-tasks', task); };
-        window.delTask = async (id) => { 
-            if(confirm('¿Eliminar esta tarea definitivamente?')) {
-                UI.closeModal();
-                await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id)); 
-                UI.toast("Tarea eliminada");
-            }
-        };
+        window.delTask = async (id) => { if(confirm('¿Eliminar esta tarea definitivamente?')) { UI.closeModal(); await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id)); UI.toast("Tarea eliminada"); } };
         window.delItem = async (col, id) => { if(confirm('¿Eliminar?')) await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', col, id)); };
         window.delShared = async (col, id) => { if(confirm('¿Eliminar Global?')) await deleteDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', col, id)); };
+        window.updateDelStatus = async (id, status) => { await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'deliveries', id), { status }); };
+        window.advanceOrder = async (id, current) => { const next = current === 'pending' ? 'ordered' : 'received'; await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status: next }); };
+        window.copyScript = (text) => { if (navigator.clipboard) { navigator.clipboard.writeText(text).then(() => UI.toast("¡Copiado!", "success")); } else { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); UI.toast("¡Copiado!", "success"); } };
+        window.downloadBackup = async () => { UI.toast("Generando Backup..."); const backup = {}; const cols = ['tasks', 'notes', 'chat', 'orders', 'deliveries', 'procedures', 'scripts', 'standards']; for (const c of cols) { const snap = await getDocs(collection(db, 'artifacts', APP_ID, 'public', 'data', c)); backup[c] = []; snap.forEach(d => backup[c].push({id: d.id, ...d.data()})); } const blob = new Blob([JSON.stringify(backup, null, 2)], {type : 'application/json'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `backup_jardin_${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); UI.toast("Backup Descargado", "success"); };
         
-        window.updateDelStatus = async (id, status) => {
-             await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'deliveries', id), { status });
-        };
-        window.advanceOrder = async (id, current) => {
-            const next = current === 'pending' ? 'ordered' : 'received';
-            await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'orders', id), { status: next });
-        };
+        window.switchStdTab = (btn, photo, h, d, auth, id) => { const card = btn.closest('.std-card'); card.querySelectorAll('button').forEach(b => { b.classList.remove('bg-emerald-600', 'text-white', 'shadow-md'); b.classList.add('bg-slate-100', 'text-slate-500'); }); btn.classList.remove('bg-slate-100', 'text-slate-500'); btn.classList.add('bg-emerald-600', 'text-white', 'shadow-md'); const img = card.querySelector('.std-img'); img.src = photo || 'https://placehold.co/600x400/e2e8f0/94a3b8?text=Sin+Foto'; card.querySelector('.std-h').innerText = h; card.querySelector('.std-d').innerText = d; card.querySelector('.std-auth').innerText = auth || 'Anónimo'; card.querySelector('.std-del-btn').onclick = () => window.delShared('standards', id); };
+        window.previewStdImage = (input) => { const file = input.files[0]; if(file) { const reader = new FileReader(); reader.onload = (e) => { const prev = document.getElementById('stdPhotoPreview'); prev.style.backgroundImage = `url(${e.target.result})`; prev.classList.remove('hidden'); document.getElementById('stdPhotoPlaceholder').classList.add('hidden'); }; reader.readAsDataURL(file); } };
+        window.handleChatImage = async (input) => { const file = input.files[0]; if(!file) return; UI.toast('Subiendo imagen...'); try { const storageRef = ref(storage, `chat/${Date.now()}_${file.name}`); const snap = await uploadBytes(storageRef, file); const url = await getDownloadURL(snap.ref); await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'chat'), { type: 'image', url, sender: State.user.uid, author: State.username, branch: State.branch, createdAt: serverTimestamp() }); UI.toast('Enviado', 'success'); } catch(e) { UI.toast('Error subida', 'error'); } input.value = ''; };
 
-        window.copyScript = (text) => {
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(text).then(() => UI.toast("¡Copiado!", "success")).catch(() => {
-                    const ta = document.createElement('textarea');
-                    ta.value = text;
-                    document.body.appendChild(ta);
-                    ta.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(ta);
-                    UI.toast("¡Copiado!", "success");
-                });
-            } else {
-                const ta = document.createElement('textarea');
-                ta.value = text;
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                UI.toast("¡Copiado!", "success");
-            }
-        };
-
-        // --- STANDARD CARD LOGIC ---
-        window.switchStdTab = (btn, photo, h, d, auth, id) => {
-            // Find parent card
-            const card = btn.closest('.std-card');
-            // Reset styles
-            card.querySelectorAll('button').forEach(b => {
-                b.classList.remove('bg-emerald-600', 'text-white', 'shadow-md');
-                b.classList.add('bg-slate-100', 'text-slate-500');
-            });
-            // Set active
-            btn.classList.remove('bg-slate-100', 'text-slate-500');
-            btn.classList.add('bg-emerald-600', 'text-white', 'shadow-md');
-            
-            // Update Content
-            const img = card.querySelector('.std-img');
-            img.src = photo;
-            card.querySelector('.std-h').innerText = h;
-            card.querySelector('.std-d').innerText = d;
-            card.querySelector('.std-auth').innerText = auth || 'Anónimo';
-            card.querySelector('.std-del-btn').onclick = () => window.delShared('standards', id);
-        };
-
-        window.previewStdImage = (input) => {
-            const file = input.files[0];
-            if(file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const prev = document.getElementById('stdPhotoPreview');
-                    prev.style.backgroundImage = `url(${e.target.result})`;
-                    prev.classList.remove('hidden');
-                    document.getElementById('stdPhotoPlaceholder').classList.add('hidden');
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-
-        window.handleChatImage = async (input) => {
-            const file = input.files[0];
-            if(!file) return;
-            UI.toast('Subiendo imagen...');
-            try {
-                const storageRef = ref(storage, `chat/${Date.now()}_${file.name}`);
-                const snap = await uploadBytes(storageRef, file);
-                const url = await getDownloadURL(snap.ref);
-                await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'chat'), { 
-                    type: 'image', url, sender: State.user.uid, author: State.username,
-                    branch: State.branch,
-                    createdAt: serverTimestamp() 
-                });
-                UI.toast('Enviado', 'success');
-            } catch(e) { UI.toast('Error subida', 'error'); }
-            input.value = '';
-        };
-        
-        window.addOrderRow = () => {
-            const container = document.getElementById('orderItemsContainer');
+        // DYNAMIC ROW ADDER FOR ORDERS & DELIVERIES
+        window.addOrderRow = (containerId = 'orderItemsContainer') => {
+            const container = document.getElementById(containerId);
             const row = document.createElement('div');
             row.className = 'flex gap-2 mb-2 order-row';
-            row.innerHTML = `
-                <input type="text" class="order-item w-[70%] p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none" placeholder="Item">
-                <input type="text" class="order-amount w-[20%] p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none" placeholder="#">
-                <button onclick="this.parentElement.remove()" class="w-[10%] text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>
-            `;
+            row.innerHTML = `<input type="text" list="stockItemsList" class="order-item w-[70%] p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none" placeholder="Item"><input type="text" class="order-amount w-[20%] p-2 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none" placeholder="#"><button onclick="this.parentElement.remove()" class="w-[10%] text-red-400 hover:text-red-600"><i class="fas fa-times"></i></button>`;
             container.appendChild(row);
         };
 
-        // SAVE ACTIONS
-        document.getElementById('saveStdBtn').onclick = async () => {
-            const species = document.getElementById('stdSpecies').value.trim();
-            const height = document.getElementById('stdHeight').value.trim();
-            const diameter = document.getElementById('stdDiameter').value.trim();
-            const fileInput = document.getElementById('stdPhotoInput');
-            const file = fileInput.files[0];
-            const sizeLabel = document.querySelector('input[name="stdSize"]:checked').value;
-
-            if(!species || !height || !file) return UI.toast('Faltan datos (Foto, Especie, Altura)', 'error');
-            
-            UI.toast("Subiendo foto...");
-            try {
-                // Upload Photo
-                const storageRef = ref(storage, `standards/${Date.now()}_${file.name}`);
-                const snap = await uploadBytes(storageRef, file);
-                const photoUrl = await getDownloadURL(snap.ref);
-
-                await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'standards'), {
-                    species: species.charAt(0).toUpperCase() + species.slice(1), // Capitalize
-                    sizeLabel, height, diameter, photoUrl,
-                    author: State.username,
-                    branch: State.branch,
-                    createdAt: serverTimestamp()
-                });
-                
-                UI.closeModal();
-                UI.toast("Estándar guardado", "success");
-            } catch(e) {
-                console.error(e);
-                UI.toast("Error al guardar", "error");
-            }
-        };
-
-        document.getElementById('saveTaskBtn').onclick = async () => {
-            const id = document.getElementById('taskId').value;
-            const text = document.getElementById('taskInput').value.trim();
-            const assignee = document.getElementById('taskAssignee').value.trim();
-            const priority = document.getElementById('taskPriority').value;
-            const cycle = document.getElementById('taskCycle').value;
-            
-            if(!text) return UI.toast('Falta descripción', 'error');
-            UI.closeModal();
-
-            const data = { text, assignee, priority, cycle, branch: State.branch, updatedAt: serverTimestamp() };
-            
-            try {
-                if(id) {
-                    await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id), data);
-                    UI.toast('Tarea actualizada', 'success');
-                } else {
-                    data.status = 'pending';
-                    data.createdAt = serverTimestamp();
-                    await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'tasks'), data);
-                    UI.toast('Tarea creada', 'success');
-                }
-            } catch(e) { console.error(e); UI.toast('Error', 'error'); }
-        };
-
+        // SAVE BUTTONS
+        document.getElementById('saveStdBtn').onclick = async () => { const species = document.getElementById('stdSpecies').value.trim(); const height = document.getElementById('stdHeight').value.trim(); const diameter = document.getElementById('stdDiameter').value.trim(); const file = document.getElementById('stdPhotoInput').files[0]; const sizeLabel = document.querySelector('input[name="stdSize"]:checked').value; if(!species) return UI.toast('Falta Especie', 'error'); let photoUrl = ''; if (file) { UI.toast("Subiendo foto..."); try { const storageRef = ref(storage, `standards/${Date.now()}_${file.name}`); const snap = await uploadBytes(storageRef, file); photoUrl = await getDownloadURL(snap.ref); } catch(e) { return UI.toast("Error subiendo foto", "error"); } } await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'standards'), { species: species.charAt(0).toUpperCase() + species.slice(1), sizeLabel, height, diameter, photoUrl, author: State.username, branch: State.branch, createdAt: serverTimestamp() }); UI.closeModal(); UI.toast("Estándar guardado", "success"); };
+        document.getElementById('saveTaskBtn').onclick = async () => { const id = document.getElementById('taskId').value; const text = document.getElementById('taskInput').value.trim(); if(!text) return UI.toast('Falta descripción', 'error'); UI.closeModal(); const data = { text, assignee: document.getElementById('taskAssignee').value.trim(), priority: document.getElementById('taskPriority').value, cycle: document.getElementById('taskCycle').value, branch: State.branch, updatedAt: serverTimestamp() }; if(id) { await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id), data); UI.toast('Tarea actualizada', 'success'); } else { data.status = 'pending'; data.createdAt = serverTimestamp(); await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'tasks'), data); UI.toast('Tarea creada', 'success'); } };
+        
         document.getElementById('saveOrderBtn').onclick = async () => {
-             const rows = document.querySelectorAll('.order-row');
-             const items = [];
-             rows.forEach(r => {
-                 const item = r.querySelector('.order-item').value.trim();
-                 const amount = r.querySelector('.order-amount').value.trim();
-                 if(item) items.push({item, amount});
-             });
-
+             const rows = document.querySelectorAll('#orderItemsContainer .order-row');
+             const items = []; rows.forEach(r => { const item = r.querySelector('.order-item').value.trim(); const amount = r.querySelector('.order-amount').value.trim(); if(item) items.push({item, amount}); });
              if(items.length === 0) return UI.toast('Agrega al menos un item', 'error');
              UI.closeModal();
-
-             await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders'), {
-                 items: items, 
-                 requester: document.getElementById('orderRequester').value,
-                 notes: document.getElementById('orderNotes').value,
-                 branch: State.branch === 'centro' ? 'Centro' : 'Ejemplares',
-                 status: 'pending',
-                 createdAt: serverTimestamp()
-             });
+             await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'orders'), { items, requester: document.getElementById('orderRequester').value, notes: document.getElementById('orderNotes').value, branch: State.branch === 'centro' ? 'Centro' : 'Ejemplares', status: 'pending', createdAt: serverTimestamp() });
              UI.toast('Pedido enviado', 'success');
         };
 
         document.getElementById('saveDelBtn').onclick = async () => {
-            const client = document.getElementById('delClient').value;
-            if(!client) return;
+            const rows = document.querySelectorAll('#delItemsContainer .order-row');
+            const items = []; rows.forEach(r => { const item = r.querySelector('.order-item').value.trim(); const amount = r.querySelector('.order-amount').value.trim(); if(item) items.push({item, amount}); });
+            if(items.length === 0) return UI.toast('Agrega al menos un item', 'error');
             UI.closeModal();
             await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'deliveries'), {
-                client,
+                client: document.getElementById('delClient').value,
                 phone: document.getElementById('delPhone').value,
-                items: document.getElementById('delItems').value,
+                items, // Array of items
+                notes: document.getElementById('delNotes').value, // Comments
                 when: document.getElementById('delWhen').value,
                 where: document.getElementById('delWhere').value,
                 status: 'pending',
                 branchOrigin: State.branch,
                 createdAt: serverTimestamp()
             });
-            document.getElementById('delClient').value = '';
             UI.toast('Reparto agendado', 'success');
         };
 
-        document.getElementById('saveNoteBtn').onclick = async () => {
-            const content = document.getElementById('noteContent').value.trim();
-            if(!content) return;
-            UI.closeModal();
-            await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'notes'), {
-                content,
-                type: document.getElementById('noteType').value,
-                branch: State.branch,
-                createdAt: serverTimestamp()
-            });
-            document.getElementById('noteContent').value = '';
-        };
+        document.getElementById('saveNoteBtn').onclick = async () => { const content = document.getElementById('noteContent').value.trim(); if(!content) return; UI.closeModal(); await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'notes'), { content, type: document.getElementById('noteType').value, branch: State.branch, createdAt: serverTimestamp() }); };
+        document.getElementById('saveProcBtn').onclick = async () => { const title = document.getElementById('procTitle').value; const steps = document.getElementById('procSteps').value; if(!title) return; UI.closeModal(); const color = document.querySelector('input[name="procColor"]:checked').value; await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'procedures'), { title, steps, color, createdAt: serverTimestamp() }); };
+        document.getElementById('saveScriptBtn').onclick = async () => { const title = document.getElementById('scriptTitle').value.trim(); const content = document.getElementById('scriptContent').value.trim(); if(!title || !content) return UI.toast('Faltan datos', 'error'); UI.closeModal(); await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'scripts'), { title, content, createdAt: serverTimestamp() }); UI.toast('Script guardado', 'success'); };
+        document.getElementById('sendChatBtn').onclick = async () => { const input = document.getElementById('chatTextInput'); const text = input.value.trim(); if(!text) return; input.value = ''; await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'chat'), { type: 'text', text, sender: State.user.uid, author: State.username, branch: State.branch, createdAt: serverTimestamp() }); };
 
-        document.getElementById('saveProcBtn').onclick = async () => {
-            const title = document.getElementById('procTitle').value;
-            const steps = document.getElementById('procSteps').value;
-            if(!title) return;
-            UI.closeModal();
-            const color = document.querySelector('input[name="procColor"]:checked').value;
-            await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'procedures'), { title, steps, color, createdAt: serverTimestamp() });
-            document.getElementById('procTitle').value = '';
-            document.getElementById('procSteps').value = '';
-        };
-
-        document.getElementById('saveScriptBtn').onclick = async () => {
-            const title = document.getElementById('scriptTitle').value.trim();
-            const content = document.getElementById('scriptContent').value.trim();
-            if(!title || !content) return UI.toast('Faltan datos', 'error');
-            UI.closeModal();
-            await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'scripts'), {
-                title, content, createdAt: serverTimestamp()
-            });
-            UI.toast('Script guardado', 'success');
-        };
-
-        document.getElementById('sendChatBtn').onclick = async () => {
-            const input = document.getElementById('chatTextInput');
-            const text = input.value.trim();
-            if(!text) return;
-            input.value = '';
-            await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'chat'), { 
-                type: 'text', text, sender: State.user.uid, author: State.username,
-                branch: State.branch,
-                createdAt: serverTimestamp() 
-            });
-        };
-
-        // INIT
         onAuthStateChanged(auth, async (user) => {
             const ind = document.getElementById('connectionStatus');
-            const loading = document.getElementById('loadingIndicator');
-            
-            if (user) {
-                State.user = user;
-                ind.innerText = "Conectado";
-                loading.classList.remove('hidden');
-                Data.resubscribe();
-                setTimeout(() => loading.classList.add('hidden'), 1000);
-            } else {
-                ind.innerText = "Desconectado";
-                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            }
+            if (user) { State.user = user; ind.innerText = "Conectado"; document.getElementById('loadingIndicator').classList.remove('hidden'); Data.resubscribe(); setTimeout(() => document.getElementById('loadingIndicator').classList.add('hidden'), 1000); }
+            else { ind.innerText = "Desconectado"; if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token); else await signInAnonymously(auth); }
         });
-
         UI.init();
     </script>
 </body>
