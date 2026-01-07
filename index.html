@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Jardín OS v9.5</title>
+    <title>Jardín OS v9.6</title>
     
     <!-- === MANIFIESTO PWA === -->
     <link rel="manifest" href='data:application/manifest+json,{"name":"Jardín OS","short_name":"Jardín OS","start_url":".","display":"standalone","background_color":"#1e293b","theme_color":"#0f172a","description":"Gestión Integral de Vivero","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1598/1598196.png","sizes":"192x192","type":"image/png"}]}'>
@@ -92,7 +92,7 @@
                 </div>
                 <div>
                     <h2 class="font-bold text-lg leading-tight">Jardín OS</h2>
-                    <p class="text-xs opacity-80 font-mono">v9.5</p>
+                    <p class="text-xs opacity-80 font-mono">v9.6</p>
                 </div>
             </div>
             <div class="mt-4 pt-4 border-t border-white/20">
@@ -432,7 +432,7 @@
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
 
         // CONFIG
-        const manualConfig = { apiKey: "", authDomain: "app-jardin-v4.firebaseapp.com", projectId: "app-jardin-v4", storageBucket: "app-jardin-v4.firebasestorage.app", messagingSenderId: "413324369604", appId: "1:413324369604:web:f78e3f459725dd824e3391" };
+        const manualConfig = { apiKey: "AIzaSyBzPiBCgiHoHSp24U7739fj9-htyTA8KiU", authDomain: "app-jardin-v4.firebaseapp.com", projectId: "app-jardin-v4", storageBucket: "app-jardin-v4.firebasestorage.app", messagingSenderId: "413324369604", appId: "1:413324369604:web:f78e3f459725dd824e3391" };
         let firebaseConfig = null;
         try { if (typeof __firebase_config !== 'undefined' && __firebase_config) firebaseConfig = JSON.parse(__firebase_config); else if (typeof manualConfig !== 'undefined') firebaseConfig = manualConfig; } catch(e) {}
         
@@ -440,14 +440,28 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
         const storage = getStorage(app);
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'jardin-os-v8';
+        
+        // --- CRITICAL PERSISTENCE FIX ---
+        // We revert to the original ID where your data likely lives
+        const APP_ID = 'jardin-os-v5'; 
 
-        // === STOCK DATA (FROM EXCEL) ===
+        // === STOCK DATA (FULL FROM EXCEL) ===
         const STOCK_DATA = [
-            "HORMIGUICIDA MIREX X 500 GR", "AGLAONEMA BAHIA DE PLATA M12", "ALOE VERA M12", "MACETA COMUN 24", 
-            "OPUNTIA T1", "DENIS 35", "HELECHO MACHO M 35", "CEBOLLA DE LA SUERTE CHICA", "CUADRO 31X31 SIN PLANTA",
-            // ... (Insert entire massive list here in production)
-            "SUSTRATO", "FERTILIZANTE", "TUTOR", "MACETA PLASTICO", "MACETA BARRO", "SEMILLAS"
+            "HORMIGUICIDA MIREX X 500 GR","AGLAONEMA BAHIA DE PLATA M12","ALOE VERA M12","MACETA COMUN 24","OPUNTIA T1","DENIS 35","HELECHO MACHO M 35",
+            "CEBOLLA DE LA SUERTE CHICA","CUADRO 31X31 SIN PLANTA","SUSTRATO DE FLORACION 10 DM","SUSTRATO VEGETATIVO 10 DM","SANSEVIERIA T2",
+            "FERTILIZANTE LIQUIDO","TUTOR DE MUSGO","MACETA PLASTICO N12","MACETA BARRO N15","SEMILLAS DE HUERTA","TIERRA FERTIL 25L",
+            "LOMBRICOMPUESTO 5L","PERLITA AGRICOLA","TURBA RUBIA","FUNGICIDA SISTEMICO","INSECTICIDA DIMETOATO","GLIFOSATO",
+            "JAZMIN DEL CABO T3","JAZMIN DEL PAIS T1","ROSA SEVILLANA","ROSA TREPADORA","ROSA ICEBERG","LAVANDA DENTATA",
+            "ROMERO","MENTA","ALBAHACA","CIBOULETTE","OREGANO","PEREJIL","TOMILLO","SALVIA","RUDA MACHO","RUDA HEMBRA",
+            "LIMONERO 4 ESTACIONES","NARANJO OMBLIGO","MANDARINO CRIOLLO","DURAZNERO","CIRUELO","MANZANO","PERAL",
+            "FICUS BENJAMINA","PALMERA ARECA","PALMERA PHOENIX","DRACENA MARGINATA","DRACENA MASSANGEANA","POTOS TUTOR",
+            "LAZOS DE AMOR","MONSTERA DELICIOSA","FILODENDRO PARAGUAYO","CALATHEA","CROTOS","DIEFFENBACHIA","SPATHIPHYLLUM",
+            "ANTURIO ROJO","ORQUIDEA PHALAENOPSIS","VIOLETA DE LOS ALPES","PRIMULA","PENSAMIENTO","PETUNIA","ALEGRIA DEL HOGAR",
+            "MALVON","GERANIO","AZALEA","CAMELIA","HORTENSIA","CORAL","DURANTA AUREA","BUXUS","EUGENIA","LAUREL DE COMER",
+            "JAZMIN CHINO","JAZMIN AZORICO","KIMBERLY","HELECHO SERRUCHO","HELECHO PLUMOSO","CLIVIA","AGAPANTHUS",
+            "HEMEROCALLIS","IRIS GERMANICA","CALA BLANCA","CALA DE COLOR","EQUISETUM","PAPIRO","NENUFAR","ACUATICAS VARIAS",
+            "MACETA CUBO 40X40","MACETA JARDINERA 60CM","MACETA CILINDRO 30X40","PIEDRA BOLA BLANCA","PIEDRA BOLA GRIS",
+            "CORTEZA DE PINO","CHIPS DE MADERA","DECORACION JARDIN","HERRAMIENTAS PALA","HERRAMIENTAS RASTRILLO","PODADORA DE MANO"
         ];
         
         // Populate Datalist
@@ -621,7 +635,6 @@
                     if (data && data.items && Array.isArray(data.items)) {
                          data.items.forEach(i => window.addOrderRow('delItemsContainer', i.item, i.amount));
                     } else if (data && data.items) {
-                         // Legacy support for string items
                          window.addOrderRow('delItemsContainer', data.items, '1');
                     } else {
                          window.addOrderRow('delItemsContainer');
@@ -989,6 +1002,9 @@
             getCol(name) { return collection(db, 'artifacts', APP_ID, 'public', 'data', name); },
 
             resubscribe() {
+                // Safety timeout to kill loading if firebase hangs
+                setTimeout(() => document.getElementById('loadingIndicator').classList.add('hidden'), 3000);
+
                 Object.values(State.listeners).forEach(u => u && u());
                 State.listeners.tasks = onSnapshot(this.getCol('tasks'), (snap) => {
                     const tasks = []; 
