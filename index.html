@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Jardín OS v9.8</title>
+    <title>Jardín OS v9.9</title>
     
     <!-- === MANIFIESTO PWA === -->
     <link rel="manifest" href='data:application/manifest+json,{"name":"Jardín OS","short_name":"Jardín OS","start_url":".","display":"standalone","background_color":"#1e293b","theme_color":"#0f172a","description":"Gestión Integral de Vivero","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/1598/1598196.png","sizes":"192x192","type":"image/png"}]}'>
@@ -92,7 +92,7 @@
                 </div>
                 <div>
                     <h2 class="font-bold text-lg leading-tight">Jardín OS</h2>
-                    <p class="text-xs opacity-80 font-mono">v9.8</p>
+                    <p class="text-xs opacity-80 font-mono">v9.9</p>
                 </div>
             </div>
             <div class="mt-4 pt-4 border-t border-white/20">
@@ -110,7 +110,7 @@
                 <li><button onclick="UI.nav('orders')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-shopping-basket w-5"></i> Pedidos <span id="badgeOrders" class="hidden bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-auto">!</span></button></li>
                 <li><button onclick="UI.nav('delivery')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-truck w-5"></i> Repartos <span id="badgeDelivery" class="hidden bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-auto">!</span></button></li>
                 <li><button onclick="UI.nav('standards')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-ruler-combined w-5"></i> Catálogo</button></li>
-                <li><button onclick="UI.nav('stock')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-boxes w-5"></i> Stock</button></li>
+                <li><button onclick="UI.nav('stock')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-boxes w-5"></i> Stock (Lista)</button></li>
                 <li><button onclick="UI.nav('scripts')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-comment-dots w-5"></i> Scripts Venta</button></li>
                 <li><button onclick="UI.nav('procedures')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-book w-5"></i> Procesos</button></li>
                 <li><button onclick="UI.nav('notes')" class="nav-item w-full text-left px-6 py-3 hover:bg-slate-50 flex items-center gap-4 text-slate-600 font-medium border-l-4 border-transparent"><i class="fas fa-sticky-note w-5"></i> Notas</button></li>
@@ -211,7 +211,7 @@
                     </div>
                     <!-- IMPORT BUTTON -->
                     <label class="flex items-center justify-center gap-2 w-full py-3 bg-blue-50 text-blue-600 rounded-xl font-bold cursor-pointer hover:bg-blue-100 transition border border-blue-200">
-                        <i class="fas fa-file-csv"></i> 📤 Importar Lista CSV
+                        <i class="fas fa-file-csv"></i> <span>📤 Importar Lista CSV</span>
                         <input type="file" id="stockCsvInput" accept=".csv" class="hidden" onchange="window.handleStockImport(this)">
                     </label>
                 </div>
@@ -449,7 +449,7 @@
         const db = getFirestore(app);
         const storage = getStorage(app);
         
-        // --- CRITICAL PERSISTENCE FIX: Pointing to v8 ---
+        // --- CRITICAL PERSISTENCE FIX: Back to V8 (where data lives) ---
         const APP_ID = 'jardin-os-v8'; 
 
         // STATE
@@ -460,7 +460,7 @@
             view: 'tasks',
             wakeLock: null,
             listeners: {},
-            stockList: []
+            stockList: [] // Will be populated from Firebase
         };
 
         // UI MANAGER
@@ -489,9 +489,6 @@
                         this.toast(`Bienvenido, ${name}`);
                     }
                 };
-
-                // Initial render empty until firebase load
-                this.renderStockList('');
             },
 
             setBranch(branch) {
@@ -568,6 +565,7 @@
                 document.getElementById('pageTitle').innerText = titles[view];
                 
                 if(view === 'chat') this.scrollToBottom('chatList');
+                if(view === 'stock' && State.stockList.length === 0) this.renderStockList(''); // Force render empty msg
             },
 
             openModal(id, data = null) {
@@ -674,15 +672,27 @@
                 const filtered = State.stockList.filter(item => item.toLowerCase().includes(term));
                 
                 if (filtered.length === 0) {
-                    container.innerHTML = '<div class="p-4 text-center text-slate-400 text-sm">No encontrado en el catálogo</div>';
+                    container.innerHTML = '<div class="p-8 text-center text-slate-400"><i class="fas fa-boxes text-4xl mb-2 opacity-50"></i><p>Sin resultados o inventario vacío</p></div>';
                     return;
                 }
 
+                // Optimization: Render only first 50 items
                 filtered.slice(0, 50).forEach(item => { 
                     const div = document.createElement('div');
-                    div.className = "p-3 text-sm text-slate-700 hover:bg-slate-50";
+                    div.className = "p-3 text-sm text-slate-700 hover:bg-slate-50 border-b border-slate-50 last:border-0";
                     div.innerText = item;
                     container.appendChild(div);
+                });
+            },
+            
+            updateAutocomplete() {
+                const datalist = document.getElementById('stockItemsList');
+                datalist.innerHTML = '';
+                // Limit autocomplete options for performance
+                State.stockList.slice(0, 500).forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = item;
+                    datalist.appendChild(option);
                 });
             },
 
@@ -1019,6 +1029,15 @@
                     const items = []; snap.forEach(d => items.push({id: d.id, ...d.data()}));
                     UI.renderOrders(items.sort((a,b) => (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0)));
                 });
+                
+                // === NEW: Listen to Stock Changes ===
+                State.listeners.stock = onSnapshot(this.getCol('stock'), (snap) => {
+                    State.stockList = [];
+                    snap.forEach(d => State.stockList.push(d.data().name));
+                    State.stockList.sort();
+                    UI.renderStockList(document.getElementById('stockSearchInput').value);
+                    UI.updateAutocomplete();
+                });
             }
         };
 
@@ -1065,19 +1084,15 @@
                 const rows = text.split('\n');
                 const newItems = [];
 
-                // Parse CSV - Assuming format from user snippet
-                // *Codigo,*Descripcion,...
-                // We want col index 1 (Descripcion)
-                
+                // Parse CSV - Assuming format: *Codigo,*Descripcion (index 1)
                 for (let i = 1; i < rows.length; i++) { // Skip header
                     const row = rows[i];
                     if (!row) continue;
                     
-                    // Simple CSV split by comma, handling potential quotes if needed basic
-                    const cols = row.split(',');
-                    // Description is usually at index 1 based on provided header "*Codigo,*Descripcion"
+                    const cols = row.split(','); // Simple split by comma
                     if (cols.length > 1) {
-                         const desc = cols[1].trim().replace(/"/g, ''); // Clean quotes
+                         // Clean quotes if any
+                         const desc = cols[1].trim().replace(/"/g, ''); 
                          if (desc) newItems.push(desc);
                     }
                 }
@@ -1087,7 +1102,7 @@
                 UI.toast(`Subiendo ${newItems.length} productos...`, "info");
 
                 // Batch upload to Firestore 'stock' collection
-                const batchSize = 400; // Safe limit
+                const batchSize = 400; 
                 const stockCol = collection(db, 'artifacts', APP_ID, 'public', 'data', 'stock');
                 
                 // We will use batches
@@ -1107,9 +1122,6 @@
             reader.readAsText(file);
         };
 
-        // --- RENDER STOCK LIST FROM FIREBASE ---
-        // Replacing the local STOCK_DATA logic
-        
         // SAVE BUTTONS
         document.getElementById('saveStdBtn').onclick = async () => { const species = document.getElementById('stdSpecies').value.trim(); const height = document.getElementById('stdHeight').value.trim(); const diameter = document.getElementById('stdDiameter').value.trim(); const file = document.getElementById('stdPhotoInput').files[0]; const sizeLabel = document.querySelector('input[name="stdSize"]:checked').value; if(!species) return UI.toast('Falta Especie', 'error'); let photoUrl = ''; if (file) { UI.toast("Subiendo foto..."); try { const storageRef = ref(storage, `standards/${Date.now()}_${file.name}`); const snap = await uploadBytes(storageRef, file); photoUrl = await getDownloadURL(snap.ref); } catch(e) { return UI.toast("Error subiendo foto", "error"); } } await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'standards'), { species: species.charAt(0).toUpperCase() + species.slice(1), sizeLabel, height, diameter, photoUrl, author: State.username, branch: State.branch, createdAt: serverTimestamp() }); UI.closeModal(); UI.toast("Estándar guardado", "success"); };
         document.getElementById('saveTaskBtn').onclick = async () => { const id = document.getElementById('taskId').value; const text = document.getElementById('taskInput').value.trim(); if(!text) return UI.toast('Falta descripción', 'error'); UI.closeModal(); const data = { text, assignee: document.getElementById('taskAssignee').value.trim(), priority: document.getElementById('taskPriority').value, cycle: document.getElementById('taskCycle').value, branch: State.branch, updatedAt: serverTimestamp() }; if(id) { await updateDoc(doc(db, 'artifacts', APP_ID, 'public', 'data', 'tasks', id), data); UI.toast('Tarea actualizada', 'success'); } else { data.status = 'pending'; data.createdAt = serverTimestamp(); await addDoc(collection(db, 'artifacts', APP_ID, 'public', 'data', 'tasks'), data); UI.toast('Tarea creada', 'success'); } };
